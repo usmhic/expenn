@@ -39,7 +39,7 @@
     <PackageReference Include="MailKit" Version="4.17.0" />
 
     <!-- S3 / MinIO -->
-    <PackageReference Include="AWSSDK.S3" Version="3.7.421.1" />
+    <PackageReference Include="AWSSDK.S3" Version="4.0.102.1" />
 
     <!-- Swagger -->
     <PackageReference Include="Swashbuckle.AspNetCore" Version="7.3.1" />
