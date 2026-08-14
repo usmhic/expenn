@@ -27,7 +27,7 @@
 
     <!-- Authentication -->
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.18" />
-    <PackageReference Include="Microsoft.Identity.Web" Version="3.8.2" />
+    <PackageReference Include="Microsoft.Identity.Web" Version="4.14.2" />
 
     <!-- Active Directory / LDAP -->
     <PackageReference Include="Novell.Directory.Ldap.NETStandard" Version="3.6.0" />
