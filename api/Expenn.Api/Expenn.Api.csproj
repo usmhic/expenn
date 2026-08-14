@@ -18,39 +18,39 @@
 
   <ItemGroup>
     <!-- EF Core + PostgreSQL -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.18" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.18">
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.19" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.19">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
 
     <!-- Authentication -->
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.18" />
-    <PackageReference Include="Microsoft.Identity.Web" Version="3.8.2" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.19" />
+    <PackageReference Include="Microsoft.Identity.Web" Version="3.15.1" />
 
     <!-- Active Directory / LDAP -->
     <PackageReference Include="Novell.Directory.Ldap.NETStandard" Version="3.6.0" />
 
     <!-- Password hashing -->
-    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+    <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
 
     <!-- Email -->
     <PackageReference Include="MailKit" Version="4.17.0" />
 
     <!-- S3 / MinIO -->
-    <PackageReference Include="AWSSDK.S3" Version="3.7.421.1" />
+    <PackageReference Include="AWSSDK.S3" Version="3.7.511.8" />
 
     <!-- Swagger -->
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="7.3.1" />
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.18" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="7.3.2" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.19" />
 
     <!-- OIDC client (generic OIDC / Entra ID / Okta / Auth0) -->
     <PackageReference Include="IdentityModel" Version="7.0.0" />
 
     <!-- Messaging — MassTransit + RabbitMQ -->
-    <PackageReference Include="MassTransit" Version="8.3.6" />
-    <PackageReference Include="MassTransit.RabbitMQ" Version="8.3.6" />
+    <PackageReference Include="MassTransit" Version="8.5.10" />
+    <PackageReference Include="MassTransit.RabbitMQ" Version="8.5.10" />
   </ItemGroup>
 
 </Project>
