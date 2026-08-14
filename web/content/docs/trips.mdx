@@ -1,0 +1,53 @@
+---
+title: Trips
+description: Creating trips, assigning travelers, tracking progress and spend
+---
+
+A **trip** is the container for a travel event — it has a destination, date range, currency, and optional budget. Expenses are attached to trips, which is how spend gets tracked and reported.
+
+## Creating a trip
+
+Go to **Trips → New trip**. You'll need:
+
+- **Name** — e.g. "Q3 Sales Summit – Berlin"
+- **Destination** — city or country
+- **Start & end dates**
+- **Currency** — the primary currency for expenses on this trip
+- **Budget** (optional) — enables the budget-vs-actual progress bar
+
+Trips can only be created by **Admins**, **Managers** (for their team), and **Owners**.
+
+## Trip statuses
+
+| Status | Meaning |
+|---|---|
+| `draft` | Created but not started — travelers can be assigned |
+| `active` | In progress — travelers are on the road |
+| `completed` | Trip ended — expenses can still be submitted |
+| `archived` | Closed — read-only |
+
+Admins and managers move trips between statuses from the trip detail page. Travelers cannot change trip status.
+
+## Assigning travelers
+
+From the trip detail page, use **Assign travelers** to add workspace members to a trip. Assigned travelers see the trip in their mobile home screen and can attach expenses to it.
+
+<Callout type="info">
+  Personal-account users don't have an "assign travelers" step — all trips
+  belong to themselves automatically.
+</Callout>
+
+## Trip progress
+
+The trip detail card shows:
+- **Date progress** — how far through the travel window you are (as a percentage)
+- **Budget vs. actual** — total approved expenses against the trip budget (if set)
+- **Pending expenses** — expenses awaiting review
+
+## Approvals on trips
+
+Once a traveler submits expenses for a trip, they appear in the **Expenses → Review queue**. Approving or rejecting expenses from that queue automatically updates the trip's spend total.
+
+## Trips in the mobile app
+
+The traveler's **Home** tab always surfaces the active trip in the hero card. The **Trips** tab shows all trips with search and status filters — tap any trip to see its full details, expense breakdown, and timeline.

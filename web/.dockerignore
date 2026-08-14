@@ -1,0 +1,50 @@
+# Dependencies (re-installed inside the image)
+node_modules/
+
+# Build outputs (produced inside the image)
+.next/
+out/
+dist/
+coverage/
+
+# Environment files — never bake secrets into the image
+.env
+.env.*
+*.env
+*.env.*
+.envrc
+.direnv/
+.flaskenv
+.flaskenv.*
+.streamlit/secrets.toml
+
+# Version control
+.git/
+.gitignore
+
+# Editor & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Docs & meta
+*.md
+LICENSE
+
+# Docker itself
+Dockerfile
+.dockerignore
+
+# Test & dev tooling
+__tests__/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+jest.config.*
+playwright.config.*
+cypress/
+
+# TypeScript build info
+*.tsbuildinfo

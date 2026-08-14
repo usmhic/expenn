@@ -1,0 +1,151 @@
+name: CI - API
+
+on:
+  pull_request:
+    paths:
+      - "api/**"
+      - ".env.example"
+      - "docker-compose.yml"
+      - ".github/workflows/api-ci.yml"
+  push:
+    branches: [main, dev]
+    paths:
+      - "api/**"
+      - ".env.example"
+      - "docker-compose.yml"
+      - ".github/workflows/api-ci.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-api-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/expenn-api
+
+jobs:
+  # ── Build & compile-check ───────────────────────────────────────────────────
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Docker Compose
+        working-directory: .
+        run: docker compose --no-interpolate config --quiet
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.x
+
+      - name: Restore
+        run: dotnet restore Expenn.Api/Expenn.Api.csproj
+
+      - name: Build
+        run: dotnet build Expenn.Api/Expenn.Api.csproj -c Release --no-restore
+
+  # ── Docker build & push (main / dev only) ───────────────────────────────────
+  docker:
+    name: Docker build & push
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
+            type=sha,prefix=sha-,format=short
+
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./api
+          file: ./api/Expenn.Api/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Docker smoke test (PRs only) ────────────────────────────────────────────
+  docker-test:
+    name: Docker smoke test
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate ephemeral CI secret
+        shell: bash
+        run: |
+          jwt_secret="$(openssl rand -hex 32)"
+          echo "::add-mask::$jwt_secret"
+          echo "Jwt__Secret=$jwt_secret" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./api
+          file: ./api/Expenn.Api/Dockerfile
+          push: false
+          load: true
+          tags: expenn-api:pr-test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Start container
+        run: |
+          docker run -d --name expenn-api-test -p 5000:8080 \
+            -e ConnectionStrings__DefaultConnection="" \
+            -e SKIP_MIGRATIONS=true \
+            -e Jwt__Secret \
+            -e Jwt__Issuer=expenn-api \
+            -e Jwt__Audience=expenn-clients \
+            expenn-api:pr-test
+
+      - name: Wait for server
+        run: |
+          for i in $(seq 1 24); do
+            curl -fsS http://localhost:5000/health && echo "" && exit 0
+            echo "[$i/24] waiting…"
+            sleep 5
+          done
+          echo "Server did not become healthy in time" && exit 1
+
+      - name: Verify health
+        run: curl -fsS http://localhost:5000/health
+
+      - name: Cleanup
+        if: always()
+        run: docker rm -f expenn-api-test || true

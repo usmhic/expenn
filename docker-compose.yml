@@ -1,0 +1,129 @@
+name: expenn
+
+services:
+  db:
+    image: postgres:16.14-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: expenn
+      POSTGRES_USER: expenn
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Copy .env.example to .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U expenn -d expenn"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: expenn
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:?Copy .env.example to .env}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_started
+    restart: "no"
+    environment:
+      MINIO_ROOT_USER: expenn
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:?Copy .env.example to .env}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"; do sleep 2; done
+        mc mb --ignore-existing local/expenn
+        mc anonymous set download local/expenn
+
+  rabbitmq:
+    image: rabbitmq:4.3-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: expenn
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Copy .env.example to .env}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Expenn.Api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=expenn;Username=expenn;Password=${POSTGRES_PASSWORD:?Copy .env.example to .env}
+      Jwt__Secret: ${JWT_SECRET:?Copy .env.example to .env}
+      Cors__AllowedOrigins__0: ${APP_URL:-http://localhost:3000}
+      Storage__Endpoint: http://minio:9000
+      Storage__PublicUrl: ${STORAGE_URL:-http://localhost:9000}
+      Storage__AccessKey: expenn
+      Storage__SecretKey: ${MINIO_PASSWORD:?Copy .env.example to .env}
+      RabbitMq__Enabled: "true"
+      RabbitMq__Host: rabbitmq
+      RabbitMq__Username: expenn
+      RabbitMq__Password: ${RABBITMQ_PASSWORD:?Copy .env.example to .env}
+      Billing__WebhookSecret: ${INTERNAL_SECRET:?Copy .env.example to .env}
+    ports:
+      - "5000:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 5
+
+  web:
+    build:
+      context: ./web
+      args:
+        APP_URL: ${APP_URL:-http://localhost:3000}
+        NEXT_PUBLIC_DOTNET_API_URL: ${API_URL:-http://localhost:5000}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      DOTNET_API_URL: http://api:8080
+      NEXT_PUBLIC_DOTNET_API_URL: ${API_URL:-http://localhost:5000}
+      NEXT_PUBLIC_APP_URL: ${APP_URL:-http://localhost:3000}
+      DOTNET_INTERNAL_SECRET: ${INTERNAL_SECRET:?Copy .env.example to .env}
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 5
+
+volumes:
+  postgres_data:
+  minio_data:
+  rabbitmq_data:

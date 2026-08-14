@@ -1,0 +1,67 @@
+---
+title: Expenses
+description: Capturing receipts, submitting expenses, and the review queue
+---
+
+Expenses are the core of expenn. A traveler creates them, optionally attaches a receipt photo, and submits them for review. An admin or manager approves or rejects — and the traveler gets notified.
+
+## Creating an expense
+
+### On web
+
+Go to **My expenses → New expense**. Fill in:
+
+- **Merchant** — who you paid (required)
+- **Amount & currency** (required)
+- **Date** — defaults to today
+- **Category** — Travel, Accommodation, Meals, Transport, Communication, Office, Entertainment, Other
+- **Trip** — the trip this expense belongs to (optional but recommended)
+- **Notes** — any context for the reviewer
+- **Receipt** — upload a photo or PDF of the receipt
+
+The expense is created as a **draft** — it won't appear in the review queue until you submit it.
+
+### On mobile
+
+Use the **Scan** tab — point the camera at a receipt, fill in the details on the form below, and tap **Save expense**. The camera captures a photo and attaches it automatically.
+
+## Expense statuses
+
+| Status | Meaning |
+|---|---|
+| `draft` | Created but not submitted — only visible to you |
+| `submitted` | Sent for review — visible to admins and managers |
+| `approved` | Accepted by a reviewer |
+| `rejected` | Rejected with a note — edit and resubmit if needed |
+| `reimbursed` | Payment confirmed — fully resolved |
+
+## Submitting expenses
+
+From the expense list, tap **Submit** on any draft expense. You can also bulk-submit all drafts at once with the **Submit all drafts** button.
+
+<Callout type="warn">
+  Once submitted you can no longer edit the expense. If you need to make a
+  change, ask your admin to reject it — then edit and resubmit.
+</Callout>
+
+## The review queue (admin & manager)
+
+Go to **Expenses** in the admin nav. All submitted expenses appear here, sorted by submission date. For each expense you can:
+
+- **Approve** — marks as approved, notifies the traveler
+- **Reject** — requires a rejection reason, sends the expense back to draft
+- **View receipt** — opens the attached image or PDF
+- **Filter** by traveler, trip, status, category, or date range
+
+Managers only see expenses from travelers in their team.
+
+## Missing receipts
+
+Any expense without an attached receipt shows a warning on the traveler's mobile home screen. The **Missing** stat chip on the home screen shows a count — tap it to go to the expense list pre-filtered to missing-receipt items.
+
+## Analytics
+
+The **Analytics** page (admin/owner only) shows:
+- Total spend by trip, traveler, and category
+- Month-over-month trend
+- Pending vs. approved breakdown

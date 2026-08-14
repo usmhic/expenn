@@ -1,0 +1,86 @@
+{
+  "expo": {
+    "name": "Expenn Traveler",
+    "slug": "expenn-traveler",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "scheme": "expenn",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0A0F"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.expenn.traveler",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Expenn needs camera access to capture receipts and documents.",
+        "NSPhotoLibraryUsageDescription": "Expenn needs photo library access to import travel documents.",
+        "NSLocationWhenInUseUsageDescription": "Expenn can use your location to tag travel captures.",
+        "NSFaceIDUsageDescription": "Expenn can use Face ID to protect traveler data."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0A0A0F"
+      },
+      "package": "com.expenn.traveler",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/icon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Expenn needs camera access to capture receipts and documents."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Expenn can use your location to tag travel captures."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#4F8EF7",
+          "sounds": []
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Expenn can use Face ID to protect traveler data."
+        }
+      ],
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

@@ -1,0 +1,307 @@
+@layer utilities {
+  .bg-hero {
+    background: var(--gradient-hero);
+  }
+
+  .bg-gradient-primary {
+    background: var(--gradient-primary);
+  }
+
+  .bg-gradient-mint {
+    background: var(--gradient-mint);
+  }
+
+  .shadow-soft {
+    box-shadow: var(--shadow-soft);
+  }
+
+  .shadow-elegant {
+    box-shadow: var(--shadow-elegant);
+  }
+
+  .shadow-mint {
+    box-shadow: var(--shadow-mint);
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .font-serif {
+    font-family: var(--font-serif);
+  }
+
+  .glass {
+    background: color-mix(in oklab, var(--color-card) 60%, transparent);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid color-mix(in oklab, var(--color-border) 80%, transparent);
+  }
+
+  .glass-strong {
+    background: color-mix(in oklab, var(--color-card) 80%, transparent);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid color-mix(in oklab, var(--color-border) 90%, transparent);
+  }
+
+  .grid-bg {
+    background-image:
+      linear-gradient(to right, color-mix(in oklab, var(--color-foreground) 5%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in oklab, var(--color-foreground) 5%, transparent) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+
+  @keyframes flow-stripes {
+    from {
+      background-position: 0 0;
+    }
+
+    to {
+      background-position: 24px 0;
+    }
+  }
+
+  .flow-stripes {
+    background-image: linear-gradient(
+      90deg,
+      currentColor 0,
+      currentColor 8px,
+      transparent 8px,
+      transparent 24px
+    );
+    background-size: 24px 100%;
+    animation: flow-stripes 0.9s linear infinite;
+  }
+
+  @keyframes flow-dash {
+    to {
+      stroke-dashoffset: -32;
+    }
+  }
+
+  .flow-line {
+    stroke-dasharray: 6 6;
+    animation: flow-dash 1.4s linear infinite;
+  }
+
+  @keyframes float-y {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+
+  .float-y {
+    animation: float-y 4s ease-in-out infinite;
+  }
+
+  @keyframes pulse-ring {
+    0% {
+      transform: scale(0.9);
+      opacity: 0.7;
+    }
+
+    100% {
+      transform: scale(1.6);
+      opacity: 0;
+    }
+  }
+
+  .pulse-ring {
+    animation: pulse-ring 2s ease-out infinite;
+  }
+
+  @keyframes scan-line {
+    0% {
+      transform: translateY(0);
+      opacity: 0;
+    }
+
+    20%,
+    80% {
+      opacity: 1;
+    }
+
+    100% {
+      transform: translateY(120px);
+      opacity: 0;
+    }
+  }
+
+  .anim-scan {
+    animation: scan-line 2.6s ease-in-out infinite;
+  }
+
+  @keyframes slide-in-up {
+    0% {
+      transform: translateY(20px);
+      opacity: 0;
+    }
+
+    100% {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  .anim-slide-up {
+    animation: slide-in-up 0.5s ease-out both;
+  }
+
+  @keyframes bar-grow {
+    from {
+      transform: scaleY(0);
+    }
+
+    to {
+      transform: scaleY(1);
+    }
+  }
+
+  .anim-bar {
+    transform-origin: bottom;
+    animation: bar-grow 1.1s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  }
+
+  @keyframes ticker {
+    0% {
+      transform: translateY(0);
+    }
+
+    25% {
+      transform: translateY(-100%);
+    }
+
+    50% {
+      transform: translateY(-200%);
+    }
+
+    75% {
+      transform: translateY(-300%);
+    }
+
+    100% {
+      transform: translateY(0);
+    }
+  }
+
+  .anim-ticker {
+    animation: ticker 8s steps(1, end) infinite;
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
+  .shimmer {
+    background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--color-foreground) 8%, transparent), transparent);
+    background-size: 200% 100%;
+    animation: shimmer 2.4s linear infinite;
+  }
+
+  @keyframes check-pop {
+    0% {
+      transform: scale(0);
+      opacity: 0;
+    }
+
+    60% {
+      transform: scale(1.15);
+      opacity: 1;
+    }
+
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  .anim-check {
+    animation: check-pop 0.45s ease-out both;
+  }
+
+  @keyframes fade-cycle {
+    0%,
+    40% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    50%,
+    90% {
+      opacity: 0;
+      transform: translateY(-6px);
+    }
+
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.35s ease both;
+  }
+}
+
+@media (max-width: 767px) {
+  .dashboard-frame {
+    display: block;
+  }
+
+  .dashboard-sidebar {
+    display: none;
+  }
+
+  .dashboard-main {
+    padding-inline: 1rem;
+  }
+
+  .top-bar {
+    min-height: 3.25rem;
+    gap: 0.5rem;
+    padding-block: 0.5rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .top-bar > div:first-child {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .context-switcher {
+    max-width: 56vw;
+  }
+
+  .top-bar .icon-button {
+    height: 2rem;
+    width: 2rem;
+  }
+
+  .mobile-nav-icon {
+    height: 2rem;
+    width: 2rem;
+  }
+}

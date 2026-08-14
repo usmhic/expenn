@@ -1,0 +1,63 @@
+---
+title: Mobile app
+description: The Expo traveler app — OTP sign-in, receipt capture, and responsive design
+---
+
+The expenn mobile app is built with **Expo** and connects to the same backend as the web app. Everything you do on mobile syncs instantly — expenses captured on the road appear in the web review queue in real time.
+
+## Getting the app
+
+The app is distributed via **Expo Go** (development) or as a standalone build via EAS.
+
+In development:
+```bash
+cd mobile && npx expo start
+```
+Scan the QR code in the Expo Go app on your phone. Point `EXPO_PUBLIC_API_URL` to your running web server.
+
+## Signing in
+
+The mobile app uses **passwordless OTP** — the same as the web:
+
+1. Enter your email address
+2. Get a 6-digit code by email
+3. Enter the code — you're signed in
+
+Your session token is stored securely in `expo-secure-store` and sent with every API call as `Authorization: Bearer <token>`.
+
+New users who sign in on mobile for the first time are automatically given a **personal workspace** — the same one you'd get choosing "Personal" on the web onboarding screen.
+
+## Tabs
+
+| Tab | What it shows |
+|---|---|
+| **Home** | Active trip card with progress, recent expenses, quick-capture shortcut |
+| **Trips** | Full trip list — search by name or destination, filter by status |
+| **Scan** (center) | Receipt camera → expense form. Attaches photo automatically |
+| **Expenses** | All your expenses — filter by status, trip, or search |
+| **Docs** | Document vault — folders, document metadata |
+| **Settings** (hidden from tab bar) | Profile, workspace, dark mode toggle, sign out |
+
+## Capturing a receipt
+
+The **Scan** tab is the fastest path to a new expense:
+
+<Steps>
+  <Step>Tap the camera circle in the center of the tab bar.</Step>
+  <Step>Aim at your receipt and tap **Take photo**. The photo is attached automatically.</Step>
+  <Step>Fill in merchant, amount, currency, and category. Select a trip if applicable.</Step>
+  <Step>Tap **Save expense** — the expense is created as a draft.</Step>
+  <Step>When you're ready, open the Expenses tab and tap **Submit** to send for review.</Step>
+</Steps>
+
+## Offline and sync
+
+The app makes live API calls — there's no local offline cache. If you're without signal, save expenses as drafts and submit when you're back online. The trip data and expense list refresh on every tab focus and on pull-to-refresh.
+
+## Responsive design
+
+The app scales correctly across all screen sizes — from a compact 320px Android to a 430px iPhone Pro Max to an iPad — using scaled spacing, typography, and layout from `constants/theme.ts`:
+
+- `scale(n)` — proportional sizing for icons, buttons, and spacing
+- `ms(n)` — gentle font scaling that keeps text readable without blowing up on tablets
+- Camera preview height is `33%` of screen height — fits every device

@@ -1,0 +1,13 @@
+@import "tailwindcss" source(none);
+@source ".";
+@source "../components";
+@source "../lib";
+@source "../server";
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "../styles/theme.css";
+@import "../styles/base.css";
+@import "../styles/components.css";
+@import "../styles/utilities.css";

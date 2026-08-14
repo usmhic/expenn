@@ -1,0 +1,13 @@
+{
+  "title": "expenn Help Center",
+  "pages": [
+    "index",
+    "getting-started",
+    "auth-and-roles",
+    "trips",
+    "expenses",
+    "documents",
+    "billing",
+    "mobile"
+  ]
+}

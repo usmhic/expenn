@@ -1,0 +1,30 @@
+# Build output
+**/bin/
+**/obj/
+**/TestResults/
+
+# Local environment and secret material
+.env
+.env.*
+*.env
+*.env.*
+.envrc
+.envrc.*
+.direnv/
+.flaskenv
+.flaskenv.*
+.streamlit/secrets.toml
+
+# Version control, editors, and operating systems
+.git/
+.gitignore
+.idea/
+.vscode/
+.vs/
+.DS_Store
+Thumbs.db
+
+# Local documentation and tooling
+*.md
+Dockerfile
+.dockerignore

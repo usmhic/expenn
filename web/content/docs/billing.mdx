@@ -1,0 +1,60 @@
+---
+title: Billing
+description: Free plan limits, personal Pro plan, and per-seat company billing
+---
+
+expenn billing is handled by **Paddle** (Merchant of Record) — they manage invoicing, tax, and payment processing globally.
+
+## Free plan
+
+Every new workspace starts on the free plan:
+
+| | Personal | Company |
+|---|---|---|
+| Seats | 1 (you) | 2 (owner + 1) |
+| Trips | Unlimited | Unlimited |
+| Expenses | Unlimited | Unlimited |
+| Documents | Unlimited | Unlimited |
+| Billing | Flat $7/mo to upgrade | $7/mo per seat beyond 2 |
+
+## Personal Pro plan
+
+If you're on a **personal account**, upgrading unlocks the full feature set for a flat rate:
+
+> **$7 / month** — one seat, all features, no per-user pricing.
+
+Go to **Account → Upgrade** (the Account link appears in your traveler nav when you're on a personal workspace).
+
+## Company per-seat billing
+
+Company workspaces include **2 seats free** (owner + 1). Each additional member costs:
+
+> **$7 / month per additional member**
+
+When you try to invite a member beyond the 2 included and you haven't subscribed, you'll see a payment-required prompt. Click it to open the checkout page, enter how many additional seats you need, and complete payment.
+
+**Example:** a 5-person team costs $21/month (3 paid seats × $7).
+
+## Managing your subscription
+
+All billing is handled through **Paddle**. After subscribing you can:
+- **Add seats** — go to `/checkout` and subscribe with a higher seat count, or manage directly in Paddle's customer portal
+- **Cancel** — cancel any time; your plan stays active until the end of the billing period
+- **View invoices** — Paddle emails invoices automatically after each charge
+
+<Callout type="info">
+  The final price shown at checkout may differ slightly from the base rate — Paddle
+  calculates taxes automatically based on your location before charging.
+</Callout>
+
+## Billing status
+
+Your workspace's billing status is visible in **Settings → Billing**:
+
+| Status | Meaning |
+|---|---|
+| `free` | On the free plan |
+| `trialing` | Active trial (if applicable) |
+| `active` | Paid and current |
+| `past_due` | Payment failed — update payment method in Paddle |
+| `canceled` | Subscription ended |

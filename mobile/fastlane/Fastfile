@@ -1,0 +1,126 @@
+default_platform(:ios)
+
+IOS_BUNDLE_IDENTIFIER = ENV["IOS_BUNDLE_IDENTIFIER"] || "com.expenn.traveler"
+IOS_WORKSPACE = "ios/ExpennTraveler.xcworkspace"
+IOS_SCHEME = "ExpennTraveler"
+
+platform :ios do
+  before_all do
+    # Creates a temporary, non-interactive keychain for this run instead of
+    # touching the runner's default keychain — standard fastlane CI setup.
+    setup_ci if ENV["CI"]
+  end
+
+  private_lane :import_signing do |options|
+    import_certificate(
+      certificate_path: options[:certificate_path],
+      certificate_password: options[:certificate_password],
+      keychain_name: ENV["MATCH_KEYCHAIN_NAME"] || "fastlane_tmp_keychain",
+    )
+    install_provisioning_profile(path: options[:profile_path])
+  end
+
+  private_lane :build_ios do |options|
+    cocoapods(podfile: "ios/Podfile")
+    gym(
+      workspace: IOS_WORKSPACE,
+      scheme: IOS_SCHEME,
+      export_method: options[:export_method],
+      export_options: {
+        provisioningProfiles: {
+          IOS_BUNDLE_IDENTIFIER => options[:profile_name],
+        },
+      },
+      output_directory: "build",
+      output_name: "ExpennTraveler.ipa",
+    )
+  end
+
+  desc "Build a signed Ad Hoc IPA for internal testing (uploaded as a workflow artifact, not to TestFlight)"
+  lane :ios_adhoc do
+    import_signing(
+      certificate_path: ENV.fetch("IOS_ADHOC_CERTIFICATE_PATH"),
+      certificate_password: ENV.fetch("IOS_ADHOC_CERTIFICATE_PASSWORD"),
+      profile_path: ENV.fetch("IOS_ADHOC_PROVISIONING_PROFILE_PATH"),
+    )
+    build_ios(
+      export_method: "ad-hoc",
+      profile_name: ENV.fetch("IOS_ADHOC_PROFILE_NAME"),
+    )
+  end
+
+  desc "Build the signed App Store IPA and upload it to TestFlight"
+  lane :ios_release do
+    import_signing(
+      certificate_path: ENV.fetch("IOS_DISTRIBUTION_CERTIFICATE_PATH"),
+      certificate_password: ENV.fetch("IOS_DISTRIBUTION_CERTIFICATE_PASSWORD"),
+      profile_path: ENV.fetch("IOS_APPSTORE_PROVISIONING_PROFILE_PATH"),
+    )
+    build_ios(
+      export_method: "app-store",
+      profile_name: ENV.fetch("IOS_APPSTORE_PROFILE_NAME"),
+    )
+
+    api_key = app_store_connect_api_key(
+      key_id: ENV.fetch("APPSTORE_CONNECT_API_KEY_ID"),
+      issuer_id: ENV.fetch("APPSTORE_CONNECT_API_ISSUER_ID"),
+      key_filepath: ENV.fetch("APPSTORE_CONNECT_API_KEY_PATH"),
+    )
+
+    upload_to_testflight(
+      api_key: api_key,
+      ipa: "build/ExpennTraveler.ipa",
+      skip_waiting_for_build_processing: true,
+    )
+  end
+end
+
+platform :android do
+  private_lane :android_signing_properties do |options|
+    {
+      "android.injected.signing.store.file" => options[:keystore_path],
+      "android.injected.signing.store.password" => options[:keystore_password],
+      "android.injected.signing.key.alias" => options[:key_alias],
+      "android.injected.signing.key.password" => options[:key_password],
+    }
+  end
+
+  desc "Build a signed internal/dev APK for manual testing (uploaded as a workflow artifact, not published)"
+  lane :android_internal do
+    gradle(
+      project_dir: "android",
+      task: "assemble",
+      build_type: "Release",
+      properties: android_signing_properties(
+        keystore_path: ENV.fetch("ANDROID_KEYSTORE_PATH"),
+        keystore_password: ENV.fetch("ANDROID_KEYSTORE_PASSWORD"),
+        key_alias: ENV.fetch("ANDROID_KEY_ALIAS"),
+        key_password: ENV.fetch("ANDROID_KEY_PASSWORD"),
+      ),
+    )
+  end
+
+  desc "Build the signed release AAB and upload it to the configured Play Console track"
+  lane :android_release do
+    gradle(
+      project_dir: "android",
+      task: "bundle",
+      build_type: "Release",
+      properties: android_signing_properties(
+        keystore_path: ENV.fetch("ANDROID_KEYSTORE_PATH"),
+        keystore_password: ENV.fetch("ANDROID_KEYSTORE_PASSWORD"),
+        key_alias: ENV.fetch("ANDROID_KEY_ALIAS"),
+        key_password: ENV.fetch("ANDROID_KEY_PASSWORD"),
+      ),
+    )
+
+    upload_to_play_store(
+      track: ENV["GOOGLE_PLAY_TRACK"] || "internal",
+      aab: lane_context[SharedValues::GRADLE_AAB_OUTPUT_PATH],
+      json_key: ENV.fetch("GOOGLE_PLAY_JSON_KEY_PATH"),
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+    )
+  end
+end
