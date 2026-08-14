@@ -49,7 +49,7 @@
     <PackageReference Include="IdentityModel" Version="7.0.0" />
 
     <!-- Messaging — MassTransit + RabbitMQ -->
-    <PackageReference Include="MassTransit" Version="8.3.6" />
+    <PackageReference Include="MassTransit" Version="9.2.0" />
     <PackageReference Include="MassTransit.RabbitMQ" Version="8.3.6" />
   </ItemGroup>
 
