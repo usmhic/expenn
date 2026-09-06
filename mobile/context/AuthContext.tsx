@@ -5,7 +5,7 @@ import * as WebBrowser from "expo-web-browser";
 import { clearStoredSession, getStoredSession, setStoredSession } from "../lib/session";
 
 // .NET API base — set EXPO_PUBLIC_API_URL to your .NET server address (LAN IP for devices)
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:5000";
+const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? "https://api.expenn.osas.cloud").replace(/\/+$/, "");
 const AUTH_BASE = `${API_URL}/api/auth`;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -16,6 +16,8 @@ export interface AuthUser {
   email: string;
   image?: string;
   emailVerified?: boolean;
+  role?: string;
+  workspace?: { name: string };
 }
 
 interface StoredSession {
@@ -37,6 +39,8 @@ interface AuthContextValue {
   signInWithAD: (username: string, password: string) => Promise<{ error?: string }>;
   /** Start OIDC browser flow (Entra ID, Okta, Auth0, …) */
   startOidc: () => Promise<{ error?: string }>;
+  /** Complete an OAuth deep-link callback. */
+  socialCallback: (token: string, expiresAt: number, user: AuthUser) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -49,6 +53,7 @@ const AuthContext = createContext<AuthContextValue>({
   signInWithPassword: async () => ({}),
   signInWithAD: async () => ({}),
   startOidc: async () => ({}),
+  socialCallback: async () => {},
   signOut: async () => {},
 });
 
@@ -245,6 +250,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const socialCallback = useCallback(async (token: string, expiresAt: number, callbackUser: AuthUser) => {
+    const sess: StoredSession = { access_token: token, expires_at: expiresAt };
+    setUser(callbackUser);
+    setSession(sess);
+    await Promise.all([setStoredSession(sess), setJson(USER_KEY, callbackUser)]);
+  }, []);
+
   const signOut = useCallback(async () => {
     try {
       if (session?.access_token) {
@@ -261,7 +273,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, session, loading, sendOtp, verifyOtp, signInWithPassword, signInWithAD, startOidc, signOut }}
+      value={{ user, session, loading, sendOtp, verifyOtp, signInWithPassword, signInWithAD, startOidc, socialCallback, signOut }}
     >
       {children}
     </AuthContext.Provider>

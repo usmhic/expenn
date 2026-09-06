@@ -4,7 +4,7 @@
  */
 import { getStoredSession } from './session';
 
-export const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5000';
+export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? 'https://api.expenn.osas.cloud').replace(/\/+$/, '');
 
 // ── Core fetch wrapper ───────────────────────────────────────────────────────
 

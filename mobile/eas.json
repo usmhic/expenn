@@ -1,0 +1,33 @@
+{
+  "cli": {
+    "version": ">= 13.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "node": "22.13.1",
+      "android": { "buildType": "apk" }
+    },
+    "open-testing": {
+      "distribution": "store",
+      "node": "22.13.1",
+      "autoIncrement": true,
+      "android": { "buildType": "app-bundle" }
+    },
+    "production": {
+      "distribution": "store",
+      "node": "22.13.1",
+      "autoIncrement": true,
+      "android": { "buildType": "app-bundle" }
+    }
+  },
+  "submit": {
+    "open-testing": {
+      "android": { "track": "internal", "releaseStatus": "draft" }
+    },
+    "production": {
+      "android": { "track": "production", "releaseStatus": "draft" }
+    }
+  }
+}

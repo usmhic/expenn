@@ -4,10 +4,14 @@ using Expenn.Api.Configuration;
 using Expenn.Api.Data;
 using Expenn.Api.Infrastructure.Database;
 using Expenn.Api.Infrastructure.Messaging;
+using Expenn.Api.Infrastructure.Security;
 using Expenn.Api.Services.Auth;
 using Expenn.Api.Services.Email;
 using Expenn.Api.Services.Storage;
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Web;
 using Microsoft.IdentityModel.Tokens;
@@ -15,6 +19,11 @@ using Microsoft.OpenApi.Models;
 using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Refuse to boot on missing or unsafe production configuration. Runs before any
+// service is registered so the failure names the setting rather than surfacing
+// later as a confusing runtime error.
+builder.ValidateProductionConfiguration();
 
 // ── Bind strongly-typed settings ──────────────────────────────────────────────
 
@@ -26,11 +35,13 @@ builder.Services.Configure<StorageSettings>(builder.Configuration.GetSection("St
 builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection("Cors"));
 builder.Services.Configure<RabbitMqSettings>(builder.Configuration.GetSection("RabbitMq"));
 builder.Services.Configure<BillingSettings>(builder.Configuration.GetSection("Billing"));
+builder.Services.Configure<SecuritySettings>(builder.Configuration.GetSection("Security"));
 
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()!;
 var adSettings = builder.Configuration.GetSection("ActiveDirectory").Get<ActiveDirectorySettings>() ?? new();
 var corsSettings = builder.Configuration.GetSection("Cors").Get<CorsSettings>() ?? new();
 var rabbitMqSettings = builder.Configuration.GetSection("RabbitMq").Get<RabbitMqSettings>() ?? new();
+var securitySettings = builder.Configuration.GetSection("Security").Get<SecuritySettings>() ?? new();
 
 // ── Database ──────────────────────────────────────────────────────────────────
 

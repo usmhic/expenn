@@ -40,7 +40,7 @@ jobs:
 
       - name: Validate Docker Compose
         working-directory: .
-        run: docker compose --no-interpolate config --quiet
+        run: docker compose config --no-interpolate --quiet
 
       - uses: actions/setup-dotnet@v4
         with:
