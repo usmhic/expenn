@@ -5,7 +5,6 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z, ZodError } from "zod";
 import { apiClient, ApiError, type AuthResponse } from "@/lib/api-client";
-import { createPaddleCheckout } from "@/lib/billing/paddle";
 import { getSignedInRedirect, getSignedInState } from "@/server/auth-redirect";
 import { roleHome } from "@/server/workspace";
 
@@ -31,10 +30,6 @@ const documentSchema = z.object({
   documentNumber: z.string().max(255).optional(),
   expiryDate: z.string().optional(),
   isSensitive: z.coerce.boolean().default(false),
-});
-
-const checkoutSchema = z.object({
-  seats: z.coerce.number().int().min(1).max(999).default(1),
 });
 
 const workspaceSetupSchema = z.object({
@@ -78,19 +73,14 @@ export async function getLandingAccountStateAction() {
   if (!state) {
     const fallback = await getSignedInRedirect(await headers());
     return fallback
-      ? { signedIn: true as const, redirectTo: fallback, workspaceName: "Workspace setup", plan: "free", billingStatus: "free", currentPeriodEndsAt: null }
+      ? { signedIn: true as const, redirectTo: fallback, workspaceName: "Workspace setup" }
       : { signedIn: false as const };
   }
-
-  const org = await (await api()).organizations.getBySlug(state.workspaceSlug).catch(() => null);
 
   return {
     signedIn: true as const,
     redirectTo: state.redirectTo,
     workspaceName: state.workspaceName,
-    plan: org?.plan ?? "free",
-    billingStatus: org?.billingStatus ?? "free",
-    currentPeriodEndsAt: org?.currentPeriodEndsAt ?? null,
   };
 }
 
@@ -121,12 +111,6 @@ export async function createWorkspaceAction(formData: FormData) {
     redirect("/login?error=session-required");
   }
 
-  const existingOrgs = await client.organizations.list();
-  const hasPaid = existingOrgs.some((o) => ["active", "trialing"].includes(o.billingStatus));
-  if (existingOrgs.length >= 1 && !hasPaid) {
-    redirect("/checkout?seats=1");
-  }
-
   const org = await client.organizations.create({ name: input.name, accountType: "company" });
   await setAuthCookie(await client.auth.switchOrg(org.id));
 
@@ -149,7 +133,6 @@ export async function acceptInvitationAction(formData: FormData) {
     authRes = await client.organizations.acceptInvitation(organizationId, invitationId);
   } catch (e) {
     const msg = e instanceof ApiError ? e.message.toLowerCase() : "";
-    if (msg.includes("seat")) redirect("/onboarding?error=seat-limit");
     if (msg.includes("email")) redirect("/onboarding?error=invite-email-mismatch");
     redirect("/onboarding?error=invite-expired");
   }
@@ -227,25 +210,6 @@ export async function createDocumentAction(formData: FormData) {
   if (errMsg) redirect(`${documentsPath}?error=${encodeURIComponent(errMsg)}`);
   revalidatePath(documentsPath);
   redirect(`${documentsPath}?created=1`);
-}
-
-export async function startPaddleCheckoutAction(formData: FormData) {
-  const state = await getSignedInState(await headers());
-  if (!state) {
-    const fallback = await getSignedInRedirect(await headers());
-    redirect(fallback ?? "/login?next=/checkout");
-  }
-
-  const input = checkoutSchema.parse(Object.fromEntries(formData.entries()));
-  const result = await createPaddleCheckout({
-    seats: input.seats,
-    organizationId: state.organizationId,
-    workspaceSlug: state.workspaceSlug,
-    userId: state.userId,
-    email: state.email,
-  });
-
-  redirect(result.checkoutUrl);
 }
 
 export async function previewReceiptExtractionAction() {

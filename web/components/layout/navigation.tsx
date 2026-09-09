@@ -693,7 +693,7 @@ function BreadcrumbDropdown({ item, currentPathname }: { item: BreadcrumbItem; c
 /* ── Helpers ────────────────────────────────────────────────────────────── */
 function getWorkspaceSlug(pathname: string) {
   const [segment] = pathname.split("/").filter(Boolean);
-  return segment && !["dashboard", "login", "register", "pricing", "onboarding"].includes(segment)
+  return segment && !["dashboard", "login", "register", "onboarding"].includes(segment)
     ? segment : "workspace";
 }
 

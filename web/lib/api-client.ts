@@ -244,12 +244,6 @@ export interface OrgDto {
   slug: string;
   logo?: string;
   accountType: string;
-  plan: string;
-  billingStatus: string;
-  paidSeats: number;
-  paddleCustomerId?: string;
-  paddleSubscriptionId?: string;
-  currentPeriodEndsAt?: string;
   createdAt: string;
 }
 

@@ -1,5 +1,7 @@
 # Contributing to Expenn
 
+Read [ARCHITECTURE.md](./ARCHITECTURE.md) first — it explains the repository
+structure and why the API, web, and mobile boundaries fall where they do.
 Repository-wide conventions live in [STANDARDS.md](./STANDARDS.md), and the
 concise machine-readable working map lives in [AGENTS.md](./AGENTS.md).
 
@@ -13,18 +15,20 @@ Install Docker 24+ with Compose v2, then:
 git clone https://github.com/usmhic/expenn.git
 cd expenn
 cp .env.example .env
-# Fill every empty value in .env before starting Compose.
+# Fill the secrets marked FILL ME at the bottom of .env, then start Compose.
 docker compose up --build
 ```
 
-On PowerShell, use `Copy-Item .env.example .env`. The web app is available at http://localhost:3000. Node and pnpm versions are pinned in `mise.toml`; install the .NET 9 SDK for native API work.
+On PowerShell, use `Copy-Item .env.example .env`. `.env.example` carries working
+localhost defaults for everything that is not a secret, so only the passwords
+and the JWT secret need values. `.env` is gitignored; never commit it. The web app is available at http://localhost:3000. Node and pnpm versions are pinned in `mise.toml`; install the .NET 9 SDK for native API work.
 
 ## Make a change
 
 1. Create a focused branch from `dev` (`feat/...`, `fix/...`, `docs/...`, or `chore/...`).
 2. Keep API, web, and mobile concerns inside their existing top-level directories.
 3. Add EF Core migrations for schema changes; never edit a deployed schema manually.
-4. Update root `.env.example` only when a new value is required to run the default Compose stack. Keep every example value empty and keep optional integration secrets out of it.
+4. Add every new configuration variable to root `.env.example`, in the section it belongs to, with a comment explaining what it does. Give it a working localhost default when it is not a secret; leave it empty and marked `FILL ME` when it is. Keep your own `.env` in the same order so a diff between the two stays readable, and never commit it.
 5. Update the nearest README when behavior or setup changes.
 
 Use Conventional Commit-style subjects, for example `fix duplicate expense approval` or `docs clarify mobile setup`.

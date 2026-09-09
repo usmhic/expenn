@@ -256,9 +256,6 @@ export interface OrgDto {
   slug: string;
   logo?: string;
   accountType: string;
-  plan: string;
-  billingStatus: string;
-  paidSeats: number;
   createdAt: string;
 }
 

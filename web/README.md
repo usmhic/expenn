@@ -10,7 +10,6 @@ Next.js 16 frontend for the Expenn travel expense workspace. Renders the admin d
 | API client | `lib/api-client.ts` → Expenn .NET REST API |
 | Auth | JWT cookie (`expenn.token`) set by the .NET API |
 | Data / storage | None — no database or object-storage credentials in this app; everything goes through the .NET API |
-| Billing | Paddle (subscriptions, webhooks) |
 | Docs | Fumadocs MDX at `/docs` |
 | UI | shadcn/ui · Tailwind CSS · Recharts |
 
@@ -36,7 +35,7 @@ The `.NET API` must be running at `DOTNET_API_URL` before the web app can serve 
 | `DOTNET_API_URL` | Internal URL of the .NET API for server-side SSR calls |
 | `NEXT_PUBLIC_DOTNET_API_URL` | Public URL of the .NET API for client-side calls |
 
-Paddle's `PADDLE_API_KEY`, `PADDLE_WEBHOOK_SECRET`, `PADDLE_PRICE_ID`, and `PADDLE_ENVIRONMENT` are optional and should be injected by the deployment platform. Database, auth, email, storage, and SSO configuration belongs to the [.NET API](../api/README.md).
+Database, auth, email, storage, and SSO configuration belongs to the [.NET API](../api/README.md).
 
 ## Auth flow
 
@@ -78,12 +77,11 @@ const summary = await api.expenses.summary();
 | `/register` | Public | Create account |
 | `/auth/oidc-callback` | Public | Receives JWT after OIDC redirect |
 | `/onboarding` | Authed | Choose personal or company workspace |
-| `/checkout` | Authed | Paddle billing |
 | `/[workspace]/admin` | admin · manager · owner | Finance dashboard |
 | `/[workspace]/admin/trips` | admin · manager · owner | Trip list & creation |
 | `/[workspace]/admin/expenses` | admin · manager · owner | Expense review queue |
 | `/[workspace]/admin/analytics` | admin · owner | Spend analytics |
-| `/[workspace]/admin/settings` | admin · owner | Members, teams, billing |
+| `/[workspace]/admin/settings` | admin · owner | Members and teams |
 | `/[workspace]/traveler` | traveler | Personal home & stats |
 | `/[workspace]/traveler/expenses` | traveler | Draft and submit expenses |
 | `/[workspace]/traveler/documents` | traveler | Document vault |
@@ -93,12 +91,10 @@ const summary = await api.expenses.summary();
 
 | Role | Access |
 |---|---|
-| `owner` | Full admin — billing, teams, members |
-| `admin` | Org-wide trips, expenses, members — no billing |
+| `owner` | Full admin — workspace settings, teams, members |
+| `admin` | Org-wide trips, expenses, members |
 | `manager` | Their team's trips & expenses only |
 | `traveler` | Own expenses, documents, assigned trips |
-
-Free plan: 2 seats (owner + 1). Additional paid members are billed via Paddle.
 
 ## Database
 

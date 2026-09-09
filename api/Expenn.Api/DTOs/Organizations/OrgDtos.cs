@@ -8,12 +8,6 @@ public record OrgDto(
     string Slug,
     string? Logo,
     string AccountType,
-    string Plan,
-    string BillingStatus,
-    int PaidSeats,
-    string? PaddleCustomerId,
-    string? PaddleSubscriptionId,
-    DateTimeOffset? CurrentPeriodEndsAt,
     DateTimeOffset CreatedAt
 );
 

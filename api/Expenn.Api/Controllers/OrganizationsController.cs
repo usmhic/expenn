@@ -24,8 +24,6 @@ public class OrganizationsController(AppDbContext db, IEmailService email, IToke
     private bool IsAdmin => Role is "owner" or "admin";
     private bool IsManager => Role is "owner" or "admin" or "manager";
 
-    private const int FreeIncludedSeats = 2;
-
     // ── List user's orgs ──────────────────────────────────────────────────────
 
     [HttpGet]
@@ -98,8 +96,7 @@ public class OrganizationsController(AppDbContext db, IEmailService email, IToke
     }
 
     private static OrgDto ToDto(Organization o) => new(
-        o.Id, o.Name, o.Slug, o.Logo, o.AccountType, o.Plan, o.BillingStatus, o.PaidSeats,
-        o.PaddleCustomerId, o.PaddleSubscriptionId, o.CurrentPeriodEndsAt, o.CreatedAt);
+        o.Id, o.Name, o.Slug, o.Logo, o.AccountType, o.CreatedAt);
 
     // ── Members ───────────────────────────────────────────────────────────────
 
@@ -190,8 +187,6 @@ public class OrganizationsController(AppDbContext db, IEmailService email, IToke
 
         if (alreadyMember) return Conflict(new { error = "User is already a member" });
 
-        if (await IsAtSeatLimitAsync(org, ct)) return Conflict(new { error = "Workspace has reached its seat limit" });
-
         var invitation = new Invitation
         {
             OrganizationId = orgId,
@@ -237,9 +232,6 @@ public class OrganizationsController(AppDbContext db, IEmailService email, IToke
         if (!string.Equals(invitation.Email, UserEmail, StringComparison.OrdinalIgnoreCase))
             return BadRequest(new { error = "Sign in with the email address that received the invitation" });
 
-        if (await IsAtSeatLimitAsync(invitation.Organization, ct))
-            return Conflict(new { error = "Workspace has reached its seat limit" });
-
         var member = await db.Members.FirstOrDefaultAsync(m => m.OrganizationId == orgId && m.UserId == UserId, ct);
         if (member is null)
         {
@@ -272,12 +264,6 @@ public class OrganizationsController(AppDbContext db, IEmailService email, IToke
         var expiresAt = DateTimeOffset.UtcNow.AddDays(30);
         var jwt = tokens.GenerateJwt(user, orgId, member.Role);
         return Ok(new AuthResponse(jwt, expiresAt, new UserDto(user.Id, user.Name, user.Email, user.Image, user.EmailVerified)));
-    }
-
-    private async Task<bool> IsAtSeatLimitAsync(Organization org, CancellationToken ct)
-    {
-        var memberCount = await db.Members.CountAsync(m => m.OrganizationId == org.Id, ct);
-        return memberCount >= FreeIncludedSeats + org.PaidSeats;
     }
 
     // ── Teams ─────────────────────────────────────────────────────────────────

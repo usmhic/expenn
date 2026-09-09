@@ -29,6 +29,66 @@ specific app, see its nested README (`api/README.md`, `web/README.md`, `mobile/R
   repo had a Next.js API layer with its own Drizzle-managed schema and Better Auth session
   handling; that layer was removed so there is exactly one place that owns data and auth.
 
+## Repository structure
+
+```
+expenn/
+├── api/                              .NET 9 REST API — sole owner of the schema, auth, and rules
+│   └── Expenn.Api/
+│       ├── Program.cs                Composition root: DI, middleware, startup migration
+│       ├── Domain/                   Domain events and exceptions (framework-agnostic)
+│       ├── Application/              Cross-cutting primitives — Result<T>, ICurrentUserContext
+│       ├── Modules/                  One persistence module per domain + DomainSchemas.cs
+│       │   ├── Identity/  Organizations/  Travel/  Expenses/  Documents/
+│       ├── Data/
+│       │   ├── AppDbContext.cs       Unit of work composing every module's mappings
+│       │   ├── Entities/             EF Core entities — the schema
+│       │   └── Migrations/           Multi-schema baseline + model snapshot
+│       ├── Controllers/              Thin HTTP layer — mapping only, no business logic
+│       ├── DTOs/                     Request/response records at the API boundary
+│       ├── Services/                 Auth (JWT/OTP/AD), email, storage implementations
+│       ├── Infrastructure/           MassTransit wiring, consumers, security middleware
+│       └── Configuration/            Strongly-typed settings bound from env vars
+│
+├── web/                              Next.js App Router client — no database of its own
+│   ├── app/
+│   │   ├── (home)/                   Public landing, privacy, terms
+│   │   ├── (auth)/                   Login and register
+│   │   ├── (dashboard)/              Onboarding + /[workspace]/{admin,traveler}/…
+│   │   ├── api/                      Route handlers proxying to the .NET API
+│   │   ├── docs/                     Fumadocs help center (end-user, not developer docs)
+│   │   └── actions.ts                Server actions — the only place the web app mutates
+│   ├── components/                   UI, layout, landing, auth, document components
+│   ├── content/docs/                 MDX source for the help center
+│   ├── lib/                          API client, i18n, Fumadocs source, utilities
+│   ├── server/                       Server-only helpers (auth redirects, workspace resolution)
+│   └── styles/                       Tailwind layers and design tokens
+│
+├── mobile/                           Expo Router client — talks to the API with a Bearer token
+│   ├── app/                          Screens: (tabs)/, trips/, document/
+│   ├── context/                      AuthContext (JWT/OTP/AD/OIDC), ThemeContext
+│   ├── lib/                          Typed API client and session storage
+│   └── components/                   Shared native UI
+│
+├── docker-compose.yml                The full local stack: Postgres, MinIO, RabbitMQ, api, web
+├── .env                              Local development values — gitignored, ready to run
+├── .env.example                      The committed reference for every variable
+├── ARCHITECTURE.md                   This file — how the system fits together and why
+├── AGENTS.md                         Condensed working map for automated contributors
+├── STANDARDS.md                      Repository-wide conventions
+├── CONTRIBUTING.md                   How to set up, change, verify, and submit
+└── PACKAGE_NAMING.md                 Naming rules for published artifacts
+```
+
+Three rules explain most of the layout:
+
+1. **One owner per concern.** The schema, auth, and business rules live only in
+   `api/`. `web/` and `mobile/` hold presentation and client-side state.
+2. **A module owns a schema.** Everything about the `expenses` domain — entity,
+   mapping, schema constant — is reachable from `api/Expenn.Api/Modules/Expenses/`.
+3. **Layers point inward.** `Controllers/` depends on `Services/` and `Data/`;
+   `Domain/` and `Application/` depend on nothing framework-specific.
+
 ## Modular monolith and schemas
 
 The API is one deployable and one public contract, but persistence is divided
@@ -41,27 +101,6 @@ continue to expose a unified REST surface; synchronous workflows remain
 in-process and domain events use MassTransit where asynchronous decoupling is
 useful. Cross-schema foreign keys preserve integrity and document dependencies
 that would need contracts if a module becomes an independent service.
-
-## Directory purposes
-
-| Directory | Responsibility |
-|---|---|
-| `api/Expenn.Api/Domain/` | Domain events and exceptions — the vocabulary of the business logic, framework-agnostic |
-| `api/Expenn.Api/Application/` | Cross-cutting application primitives (`Result<T>`, `ICurrentUserContext`) |
-| `api/Expenn.Api/Infrastructure/` | MassTransit/RabbitMQ wiring and consumers — the messaging plumbing |
-| `api/Expenn.Api/Modules/` | Domain persistence modules and schema ownership constants |
-| `api/Expenn.Api/Controllers/` | Thin HTTP layer — request/response mapping only, no business logic |
-| `api/Expenn.Api/Data/` | EF Core unit of work, entities, and the composed baseline migration |
-| `api/Expenn.Api/Services/` | Auth, email, and storage implementations |
-| `api/Expenn.Api/Configuration/` | Strongly-typed settings bound from environment variables |
-| `api/Expenn.Api/DTOs/` | Request/response records exposed at the API boundary |
-| `web/app/` | Next.js App Router pages and route groups |
-| `web/lib/` | API client, auth helpers, and other client-side utilities |
-| `web/content/docs/` | Fumadocs MDX source for the in-product help center (end-user docs, not developer docs) |
-| `mobile/app/` | Expo Router screens |
-| `mobile/context/` | React context providers, notably `AuthContext` for JWT/OTP/AD/OIDC state |
-| `mobile/lib/` | Typed API client shared across screens |
-| `ARCHITECTURE.md` | This file — engineering-facing architecture documentation |
 
 ## Data flow
 

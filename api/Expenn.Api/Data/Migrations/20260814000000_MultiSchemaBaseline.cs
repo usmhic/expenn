@@ -55,12 +55,6 @@ namespace Expenn.Api.Data.Migrations
                     slug = table.Column<string>(type: "text", nullable: false),
                     logo = table.Column<string>(type: "text", nullable: true),
                     account_type = table.Column<string>(type: "text", nullable: false),
-                    plan = table.Column<string>(type: "text", nullable: false),
-                    billing_status = table.Column<string>(type: "text", nullable: false),
-                    paddle_customer_id = table.Column<string>(type: "text", nullable: true),
-                    paddle_subscription_id = table.Column<string>(type: "text", nullable: true),
-                    paid_seats = table.Column<int>(type: "integer", nullable: false),
-                    current_period_ends_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     created_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     updated_at = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
                 },

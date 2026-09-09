@@ -34,7 +34,6 @@ builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("Emai
 builder.Services.Configure<StorageSettings>(builder.Configuration.GetSection("Storage"));
 builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection("Cors"));
 builder.Services.Configure<RabbitMqSettings>(builder.Configuration.GetSection("RabbitMq"));
-builder.Services.Configure<BillingSettings>(builder.Configuration.GetSection("Billing"));
 builder.Services.Configure<SecuritySettings>(builder.Configuration.GetSection("Security"));
 
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()!;

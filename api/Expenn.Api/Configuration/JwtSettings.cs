@@ -58,12 +58,6 @@ public class CorsSettings
     public string[] AllowedOrigins { get; set; } = [];
 }
 
-public class BillingSettings
-{
-    /// <summary>Shared secret the web app's Paddle webhook route must send as X-Internal-Secret.</summary>
-    public string WebhookSecret { get; set; } = string.Empty;
-}
-
 public class OidcSettings
 {
     public bool Enabled { get; set; }

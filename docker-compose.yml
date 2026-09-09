@@ -89,7 +89,6 @@ services:
       RabbitMq__Host: rabbitmq
       RabbitMq__Username: expenn
       RabbitMq__Password: ${RABBITMQ_PASSWORD:?Copy .env.example to .env}
-      Billing__WebhookSecret: ${INTERNAL_SECRET:?Copy .env.example to .env}
     ports:
       - "5000:8080"
     healthcheck:
@@ -113,7 +112,6 @@ services:
       DOTNET_API_URL: http://api:8080
       NEXT_PUBLIC_DOTNET_API_URL: ${API_URL:-http://localhost:5000}
       NEXT_PUBLIC_APP_URL: ${APP_URL:-http://localhost:3000}
-      DOTNET_INTERNAL_SECRET: ${INTERNAL_SECRET:?Copy .env.example to .env}
     ports:
       - "3000:3000"
     healthcheck:

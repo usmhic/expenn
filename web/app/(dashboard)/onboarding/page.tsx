@@ -119,7 +119,7 @@ export default async function OnboardingPage({
                   <div>
                     <h3 className="text-base font-bold">Manage Company Expenses</h3>
                     <p className="mt-0.5 text-sm text-muted-foreground">
-                      Set up a workspace for your team. Free plan includes one admin and one traveler.
+                      Set up a workspace for your team and invite as many travelers as you need.
                     </p>
                   </div>
                 </div>
@@ -200,9 +200,7 @@ export default async function OnboardingPage({
                     <div>
                       <h3 className="text-base font-bold">New workspace</h3>
                       <p className="mt-0.5 text-sm text-muted-foreground">
-                        {hasWorkspace
-                          ? "Requires an active subscription for your account."
-                          : "Free plan includes one workspace, one admin, and one traveler."}
+                        Spin up another workspace for a different team or company.
                       </p>
                     </div>
                   </div>
@@ -287,7 +285,6 @@ function OnboardingAlert({ error }: { error: string }) {
   const message =
     error === "invite-expired" ? "That invitation is no longer valid." :
     error === "invite-email-mismatch" ? "Sign in with the email address that received the invitation." :
-    error === "seat-limit" ? "That workspace has reached its seat limit. Ask an admin to upgrade the plan." :
     error === "database-required" ? "Database connection error. Please contact support." :
     "Something went wrong. Please try again.";
 

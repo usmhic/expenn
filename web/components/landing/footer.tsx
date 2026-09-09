@@ -15,7 +15,6 @@ export function SiteFooter() {
           <h4 className="text-sm font-semibold text-ink">{t.footer.product}</h4>
           <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
             <li><Link href="/#features" className="hover:text-foreground">{t.nav.features}</Link></li>
-            <li><Link href="/#pricing" className="hover:text-foreground">{t.nav.pricing}</Link></li>
             <li><Link href="/#workflow" className="hover:text-foreground">{t.nav.how}</Link></li>
             <li><a href="mailto:hi@expenn.com" className="hover:text-foreground">{t.nav.contact}</a></li>
           </ul>

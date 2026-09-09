@@ -418,18 +418,9 @@ namespace Expenn.Api.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("account_type");
 
-                    b.Property<string>("BillingStatus")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("billing_status");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
-
-                    b.Property<DateTimeOffset?>("CurrentPeriodEndsAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("current_period_ends_at");
 
                     b.Property<string>("Logo")
                         .HasColumnType("text")
@@ -439,23 +430,6 @@ namespace Expenn.Api.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("name");
-
-                    b.Property<string>("PaddleCustomerId")
-                        .HasColumnType("text")
-                        .HasColumnName("paddle_customer_id");
-
-                    b.Property<string>("PaddleSubscriptionId")
-                        .HasColumnType("text")
-                        .HasColumnName("paddle_subscription_id");
-
-                    b.Property<int>("PaidSeats")
-                        .HasColumnType("integer")
-                        .HasColumnName("paid_seats");
-
-                    b.Property<string>("Plan")
-                        .IsRequired()
-                        .HasColumnType("text")
-                        .HasColumnName("plan");
 
                     b.Property<string>("Slug")
                         .IsRequired()

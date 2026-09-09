@@ -63,9 +63,6 @@ COPY --link --from=builder --chown=1001:1001 /app/.next/static     ./.next/stati
 # talks to the .NET API. Required at runtime:
 #   DOTNET_API_URL         Internal URL of the .NET API (server-side SSR calls)
 #
-# Optional:
-#   PADDLE_*
-#
 # See the repository-root .env.example and service READMEs. Database, auth,
 # email, storage, and OAuth/SSO config all live on the .NET API.
 

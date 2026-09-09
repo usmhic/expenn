@@ -20,5 +20,5 @@ may require an upgrade.
 ## Deployment notes
 
 Use HTTPS, keep PostgreSQL, RabbitMQ, and MinIO private, rotate all local sample
-credentials, verify billing webhooks, and store production and mobile signing
-secrets outside the repository.
+credentials, and store production and mobile signing secrets outside the
+repository.

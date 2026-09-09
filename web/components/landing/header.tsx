@@ -24,7 +24,6 @@ export function SiteHeader({ account }: { account?: LandingAccountState | null }
           <nav className="hidden lg:flex items-center justify-center gap-6 text-sm font-medium text-muted-foreground flex-1 px-6">
             <Link href="/#workflow" className="hover:text-foreground transition">{t.nav.how}</Link>
             <Link href="/#features" className="hover:text-foreground transition">{t.nav.features}</Link>
-            <Link href="/#pricing" className="hover:text-foreground transition">{t.nav.pricing}</Link>
             <a href="mailto:hi@expenn.com" className="hover:text-foreground transition">{t.nav.contact}</a>
           </nav>
 
@@ -50,7 +49,6 @@ export function SiteHeader({ account }: { account?: LandingAccountState | null }
             <nav className="flex flex-col gap-3 text-sm font-medium">
               <Link href="/#workflow" onClick={() => setOpen(false)} className="text-foreground">{t.nav.how}</Link>
               <Link href="/#features" onClick={() => setOpen(false)} className="text-foreground">{t.nav.features}</Link>
-              <Link href="/#pricing" onClick={() => setOpen(false)} className="text-foreground">{t.nav.pricing}</Link>
               <a href="mailto:hi@expenn.com" className="text-foreground">{t.nav.contact}</a>
               {account?.signedIn && (
                 <Link href={dashboardHref} onClick={() => setOpen(false)} className="primary-button mt-1 text-sm">Dashboard</Link>

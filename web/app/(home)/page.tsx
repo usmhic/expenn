@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Camera, Receipt, CreditCard, BarChart3, FolderLock,
-  Users, Smartphone, Check, ArrowRight, Briefcase,
+  Users, Smartphone, ArrowRight, Briefcase,
   ScanLine, FolderTree, Send, Wallet, Inbox, Eye, ThumbsUp, FileSpreadsheet,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
@@ -64,9 +64,6 @@ function Hero({ account }: { account: LandingAccountState | null }) {
                 <div className="flex flex-wrap gap-2.5 justify-center">
                   <Button asChild size="sm" className="h-10 px-5 text-sm bg-ink text-background hover:opacity-90 rounded-full shadow-elegant">
                     <Link href={dashboardHref}>Open dashboard <ArrowRight className="ml-1 h-4 w-4" /></Link>
-                  </Button>
-                  <Button asChild size="sm" variant="outline" className="h-10 px-5 text-sm rounded-full glass border-border">
-                    <Link href="/#pricing">Review plan</Link>
                   </Button>
                 </div>
                 {view === "traveler" && <StoreButtons />}
@@ -337,74 +334,6 @@ function Features() {
   );
 }
 
-/* ---------------- Pricing ---------------- */
-function Pricing({ account }: { account: LandingAccountState | null }) {
-  const { t } = useI18n();
-  const currentPlan = account?.signedIn ? account.plan : null;
-  const isPaid = currentPlan === "pro";
-  return (
-    <section id="pricing" className="mx-auto max-w-7xl px-4 sm:px-6 py-20 sm:py-28">
-      <div className="text-center max-w-2xl mx-auto">
-        <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-ink">
-          {t.pricing.title1} <span className="font-serif italic font-normal text-primary">{t.pricing.title2}</span>
-        </h2>
-      </div>
-      <div className="mt-12 grid md:grid-cols-2 gap-5 max-w-4xl mx-auto">
-        <div className="glass rounded-3xl p-7 sm:p-8">
-          <div className="flex items-center justify-between gap-3">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{t.pricing.free}</h3>
-            {currentPlan === "free" && <span className="rounded-full bg-primary/10 px-2 py-1 text-xs font-semibold text-primary">Current plan</span>}
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">{t.pricing.freeSub}</p>
-          <div className="mt-6 flex items-baseline gap-1">
-            <span className="text-4xl sm:text-5xl font-bold text-ink tracking-tight">$0</span>
-            <span className="text-muted-foreground">{t.pricing.forever}</span>
-          </div>
-          <ul className="mt-7 space-y-2.5 text-sm">
-            {t.pricing.freeFeats.map((f: string) => (
-              <li key={f} className="flex items-center gap-2.5 text-foreground">
-                <Check className="h-4 w-4 text-primary" /> {f}
-              </li>
-            ))}
-          </ul>
-          <Button asChild variant="outline" size="sm" className="mt-8 w-full h-10 rounded-full border-border glass">
-            <a href={account?.signedIn ? account.redirectTo : "/register"}>{currentPlan === "free" ? "Open dashboard" : t.pricing.ctaFree}</a>
-          </Button>
-        </div>
-        <div className="rounded-3xl p-7 sm:p-8 bg-ink text-background relative overflow-hidden">
-          <div
-            className="absolute -top-20 -right-20 h-64 w-64 rounded-full blur-3xl opacity-60"
-            style={{ background: "radial-gradient(circle, oklch(0.78 0.15 175 / 0.6), transparent 70%)" }}
-          />
-          <div className="relative">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-mint">{t.pricing.team}</h3>
-              <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-mint text-mint-foreground font-semibold">
-                {isPaid ? "Current plan" : t.pricing.teamBadge}
-              </span>
-            </div>
-            <p className="mt-1 text-sm opacity-70">{t.pricing.teamSub}</p>
-            <div className="mt-6 flex items-baseline gap-1">
-              <span className="text-4xl sm:text-5xl font-bold tracking-tight">$7</span>
-              <span className="opacity-70">{t.pricing.perTraveler}</span>
-            </div>
-            <ul className="mt-7 space-y-2.5 text-sm">
-              {t.pricing.teamFeats.map((f: string) => (
-                <li key={f} className="flex items-center gap-2.5">
-                  <Check className="h-4 w-4 text-mint" /> {f}
-                </li>
-              ))}
-            </ul>
-            <Button asChild size="sm" className="mt-8 w-full h-10 rounded-full bg-background text-ink hover:opacity-90">
-              <a href={account?.signedIn ? "/checkout?seats=1" : "/register?next=/checkout"}>{isPaid ? "Manage checkout" : t.pricing.ctaTeam}</a>
-            </Button>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 /* ---------------- Final CTA ---------------- */
 function FinalCTA({ account }: { account: LandingAccountState | null }) {
   const { t } = useI18n();
@@ -431,9 +360,11 @@ function FinalCTA({ account }: { account: LandingAccountState | null }) {
             <Button asChild size="sm" className="h-10 px-5 rounded-full bg-ink text-background hover:opacity-90 shadow-elegant">
               <a href={dashboardHref ?? "/register"}>{dashboardHref ? "Open dashboard" : t.final.cta1} <ArrowRight className="ml-1 h-4 w-4" /></a>
             </Button>
-            <Button asChild size="sm" variant="outline" className="h-10 px-5 rounded-full glass border-border">
-              <a href={dashboardHref ? "/checkout?seats=1" : "/login"}>{dashboardHref ? "Manage plan" : t.final.cta2}</a>
-            </Button>
+            {!dashboardHref && (
+              <Button asChild size="sm" variant="outline" className="h-10 px-5 rounded-full glass border-border">
+                <a href="/login">{t.final.cta2}</a>
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -466,7 +397,6 @@ function Index() {
         <Workflow />
         <Problem />
         <Features />
-        <Pricing account={account} />
         <FinalCTA account={account} />
       </main>
       <SiteFooter />
