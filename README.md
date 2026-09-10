@@ -222,6 +222,7 @@ credentials remain in GitHub Secrets; see the [mobile guide](./mobile/README.md#
 | [API guide](./api/README.md) | .NET modules, migrations, and optional integrations |
 | [Web guide](./web/README.md) | Next.js app, workspace routing, and the help center |
 | [Mobile guide](./mobile/README.md) | Expo setup, device testing, Fastlane, and releases |
+| [Mobile delivery](./MOBILE_DELIVERY.md) | Signing secrets, App Distribution, and store submission |
 | [Engineering standards](./STANDARDS.md) | Shared conventions across every usmhic project |
 | [Package naming](./PACKAGE_NAMING.md) | Public package, namespace, and app identifiers |
 | [Coding-agent guide](./AGENTS.md) | Repository map, commands, and guardrails |
