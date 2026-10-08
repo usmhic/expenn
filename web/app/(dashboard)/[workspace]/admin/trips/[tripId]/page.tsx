@@ -59,10 +59,12 @@ export default async function AdminTripDetailPage({
   const assignedUserIds = travelers.map((t) => t.userId);
 
   // Budget & spend
-  const spent = expenses
+  // Budget math only counts expenses in the trip's currency.
+  const inTripCurrency = expenses.filter((e) => e.currency === trip.currency);
+  const spent = inTripCurrency
     .filter((e) => ["approved", "reimbursed", "submitted"].includes(e.status))
     .reduce((s, e) => s + Number(e.amount), 0);
-  const approvedSpend = expenses
+  const approvedSpend = inTripCurrency
     .filter((e) => ["approved", "reimbursed"].includes(e.status))
     .reduce((s, e) => s + Number(e.amount), 0);
   const budget = Number(trip.budget);

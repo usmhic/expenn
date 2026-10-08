@@ -38,14 +38,7 @@ function createClient(opts: FetchOptions = {}) {
     body?: unknown,
     params?: Record<string, string | number | boolean | undefined>
   ): Promise<T> {
-    let url = `${API_BASE}${path}`;
-    if (params) {
-      const qs = Object.entries(params)
-        .filter(([, v]) => v !== undefined && v !== null)
-        .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
-        .join('&');
-      if (qs) url += `?${qs}`;
-    }
+    const url = withParams(path, params);
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -68,6 +61,27 @@ function createClient(opts: FetchOptions = {}) {
 
     const text = await res.text();
     return text ? (JSON.parse(text) as T) : (undefined as T);
+  }
+
+  function withParams(path: string, params?: Record<string, string | number | boolean | undefined>) {
+    const qs = Object.entries(params ?? {})
+      .filter(([, v]) => v !== undefined && v !== null && v !== '')
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+      .join('&');
+    return `${API_BASE}${path}${qs ? `?${qs}` : ''}`;
+  }
+
+  /** GET that returns the untouched Response (for file downloads). */
+  async function raw(path: string, params?: Record<string, string | number | boolean | undefined>) {
+    const headers: Record<string, string> = {};
+    if (opts.cookie) headers['Cookie'] = opts.cookie;
+    if (opts.token) headers['Authorization'] = `Bearer ${opts.token}`;
+    const res = await fetch(withParams(path, params), { headers, cache: 'no-store' });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, data?.error ?? data?.title ?? `HTTP ${res.status}`);
+    }
+    return res;
   }
 
   const get = <T>(path: string, params?: Record<string, string | number | boolean | undefined>) =>
@@ -158,14 +172,20 @@ function createClient(opts: FetchOptions = {}) {
     },
 
     expenses: {
-      list: (params?: { status?: string; tripId?: string; mine?: boolean }) =>
-        get<ExpenseDto[]>('/api/expenses', params),
+      list: (params?: ExpenseListParams) => get<ExpenseDto[]>('/api/expenses', params),
       getById: (id: string) => get<ExpenseDto>(`/api/expenses/${id}`),
       create: (body: CreateExpenseRequest) => post<ExpenseDto>('/api/expenses', body),
+      /** Replaces a draft or rejected expense; a rejected expense returns to draft. */
+      update: (id: string, body: CreateExpenseRequest) => put<ExpenseDto>(`/api/expenses/${id}`, body),
+      delete: (id: string) => del(`/api/expenses/${id}`),
       submit: (id: string) => post<ExpenseDto>(`/api/expenses/${id}/submit`),
       review: (id: string, status: string, notes?: string) =>
         patch<ExpenseDto>(`/api/expenses/${id}/review`, { status, notes }),
+      bulkReview: (ids: string[], status: string, notes?: string) =>
+        post<BulkReviewResultDto>('/api/expenses/review', { ids, status, notes }),
       summary: () => get<ExpenseSummaryDto>('/api/expenses/summary'),
+      /** Raw CSV response — used by the web export route to stream the file to the browser. */
+      exportCsv: (params?: ExpenseListParams) => raw('/api/expenses/export', params),
     },
 
     documents: {
@@ -195,7 +215,7 @@ function createClient(opts: FetchOptions = {}) {
     },
 
     analytics: {
-      overview: (params?: { year?: number; month?: number }) => get('/api/analytics/overview', params),
+      overview: (params?: { year?: number; month?: number }) => get<AnalyticsOverviewDto>('/api/analytics/overview', params),
       spendByGroup: (params?: { year?: number }) => get('/api/analytics/spend-by-group', params),
     },
 
@@ -340,6 +360,34 @@ export interface ExpenseDto {
   updatedAt: string;
   travelerName?: string;
   tripName?: string;
+  /** Review hints from the API: `missing_receipt`, `possible_duplicate`. */
+  flags?: string[];
+  submittedAt?: string;
+  reviewedAt?: string;
+  reviewedByName?: string;
+  /** Reviewer's note — always present on rejected expenses. */
+  reviewNote?: string;
+  reimbursedAt?: string;
+}
+
+export interface ExpenseListParams {
+  status?: string;
+  tripId?: string;
+  mine?: boolean;
+  from?: string;
+  to?: string;
+  [key: string]: string | number | boolean | undefined;
+}
+
+export interface CurrencyTotalDto {
+  currency: string;
+  /** Everything submitted or later, excluding rejected. */
+  total: number;
+  /** Submitted, awaiting a decision. */
+  pending: number;
+  /** Approved and reimbursable, not yet paid. */
+  owed: number;
+  reimbursed: number;
 }
 
 export interface ExpenseSummaryDto {
@@ -350,6 +398,31 @@ export interface ExpenseSummaryDto {
   rejected: number;
   reimbursed: number;
   totalAmount: number;
+  byCurrency?: CurrencyTotalDto[];
+}
+
+export interface BulkReviewResultDto {
+  updated: number;
+  failed: { id: string; error: string }[];
+}
+
+export interface AnalyticsOverviewDto {
+  period: { from: string; to: string };
+  expenseCount: number;
+  tripCount: number;
+  memberCount: number;
+  missingReceipts: number;
+  avgHoursToReview?: number | null;
+  avgDaysToReimburse?: number | null;
+  byCurrency: { currency: string; total: number; approved: number; pending: number; reimbursed: number; budget: number }[];
+  byStatus: { status: string; count: number }[];
+  byCategory: { category: string; currency: string; count: number; amount: number }[];
+  byMonth: { year: number; month: number; currency: string; amount: number }[];
+  topSpenders: { userId: string; name: string; currency: string; count: number; amount: number }[];
+  trips: {
+    tripId: string; name: string; destination: string; status: string; startDate: string; endDate: string;
+    budget: number; currency: string; approved: number; pending: number;
+  }[];
 }
 
 export interface DocumentDto {
@@ -384,6 +457,12 @@ export interface CommentDto {
 export interface NotificationsDto {
   pendingApprovals: number;
   pendingExpenses: number;
+  /** Approved, reimbursable expenses not yet paid out (managers). */
+  awaitingPayment: number;
+  /** The caller's own expenses sent back by a reviewer. */
+  rejectedExpenses: number;
+  /** The caller's own drafts not yet submitted. */
+  draftExpenses: number;
 }
 
 export interface StorageUploadDto {

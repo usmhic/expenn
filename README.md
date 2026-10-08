@@ -47,10 +47,12 @@ graveyards, no shoebox of crumpled receipts.
 ## ✨ Two sides, one flow
 
 **For travelers** 🎒 — capture receipts on the go, log expenses against a trip, store passports
-and itineraries in the document vault, and submit for reimbursement when you're back.
+and itineraries in the document vault, submit for reimbursement, fix anything that's sent back, and
+always see what you're owed.
 
-**For finance and admins** 📊 — create and assign trips, review submitted expenses, approve or
-reject with a note, and track team spend across every trip from one dashboard.
+**For finance and admins** 📊 — create and assign trips, work through one review-and-pay queue
+(bulk approve, send back with a reason, mark paid), export to CSV for payroll or accounting, and
+track spend per currency, per trip, and how fast people get reimbursed.
 
 ```
 capture ──▶ log against a trip ──▶ submit ──▶ review ──▶ approve ──▶ reimburse
@@ -223,6 +225,7 @@ credentials remain in GitHub Secrets; see the [mobile guide](./mobile/README.md#
 | [Web guide](./web/README.md) | Next.js app, workspace routing, and the help center |
 | [Mobile guide](./mobile/README.md) | Expo setup, device testing, Fastlane, and releases |
 | [Mobile delivery](./MOBILE_DELIVERY.md) | Signing secrets, App Distribution, and store submission |
+| [Product strategy](./PRODUCT_STRATEGY.md) | Market research, roadmap, and business model |
 | [Engineering standards](./STANDARDS.md) | Shared conventions across every usmhic project |
 | [Package naming](./PACKAGE_NAMING.md) | Public package, namespace, and app identifiers |
 | [Coding-agent guide](./AGENTS.md) | Repository map, commands, and guardrails |

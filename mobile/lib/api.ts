@@ -351,6 +351,15 @@ export interface ExpenseDto {
   createdAt: string;
   updatedAt: string;
   tripName?: string;
+  travelerName?: string;
+  /** Review hints from the API: `missing_receipt`, `possible_duplicate`. */
+  flags?: string[];
+  submittedAt?: string;
+  reviewedAt?: string;
+  reviewedByName?: string;
+  /** Reviewer's note — always present on rejected expenses. */
+  reviewNote?: string;
+  reimbursedAt?: string;
 }
 
 export interface ExpenseSummaryDto {
@@ -361,6 +370,8 @@ export interface ExpenseSummaryDto {
   rejected: number;
   reimbursed: number;
   totalAmount: number;
+  /** Per-currency totals; amounts in different currencies are never added together. */
+  byCurrency?: { currency: string; total: number; pending: number; owed: number; reimbursed: number }[];
 }
 
 export interface DocumentDto {

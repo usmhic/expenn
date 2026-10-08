@@ -23,7 +23,7 @@ async function wsPath(role: "admin" | "traveler", path = "") {
   return `/${state.workspaceSlug}/${role}${path}`;
 }
 
-export type DialogState = { success?: boolean; error?: string } | null;
+export type DialogState = { success?: boolean; error?: string; message?: string } | null;
 
 export async function createTripDialogAction(_: DialogState, formData: FormData): Promise<DialogState> {
   try {
@@ -44,44 +44,99 @@ export async function createTripDialogAction(_: DialogState, formData: FormData)
   } catch (e) { return { error: errMsg(e) }; }
 }
 
+const expenseFormSchema = z.object({
+  merchant: z.string().trim().min(2, "Merchant must be at least 2 characters."),
+  amount: z.coerce.number().positive("Amount must be greater than zero."),
+  currency: z.string().trim().min(3).max(5),
+  category: z.string().trim().min(2, "Pick a category."),
+  date: z.string().date("Pick the date on the receipt."),
+  notes: z.string().optional(),
+  tripId: z.string().optional(),
+  paymentMethod: z.enum(["cash", "personal_card", "company_card", "bank_transfer", "other"]).optional().or(z.literal("")),
+  reimbursable: z.enum(["on", "true", "false"]).optional(),
+  status: z.enum(["draft", "submitted"]).default("draft"),
+});
+
+/** Parses the shared expense form and uploads an attached receipt, if any. */
+async function readExpenseForm(formData: FormData, client: Awaited<ReturnType<typeof api>>) {
+  const input = expenseFormSchema.parse(Object.fromEntries(formData.entries()));
+  const receipt = formData.get("receipt");
+  const uploadedReceipt =
+    receipt instanceof File && receipt.size > 0 ? await client.storage.upload(receipt, "receipts") : null;
+  return {
+    input,
+    body: {
+      merchant: input.merchant,
+      amount: input.amount,
+      currency: input.currency.toUpperCase(),
+      category: input.category,
+      expenseDate: input.date,
+      notes: input.notes?.trim() || undefined,
+      tripId: input.tripId || undefined,
+      paymentMethod: input.paymentMethod || undefined,
+      // Unchecked checkboxes are absent from FormData; the hidden "false" keeps intent explicit.
+      reimbursable: input.reimbursable !== "false",
+      receiptFileUrl: uploadedReceipt?.url,
+    },
+  };
+}
+
+async function revalidateExpensePaths(tripId?: string | null) {
+  revalidatePath(await wsPath("traveler"));
+  revalidatePath(await wsPath("traveler", "/expenses"));
+  revalidatePath(await wsPath("admin", "/expenses"));
+  if (tripId) {
+    revalidatePath(await wsPath("traveler", `/trips/${tripId}`));
+    revalidatePath(await wsPath("admin", `/trips/${tripId}`));
+  }
+}
+
 export async function createExpenseDialogAction(_: DialogState, formData: FormData): Promise<DialogState> {
   const state = await getSignedInState(await headers());
   if (!state) return { error: "Session expired. Please sign in again." };
   try {
-    const input = z.object({
-      merchant: z.string().min(2),
-      amount: z.coerce.number().positive(),
-      currency: z.string().min(3).max(5),
-      category: z.string().min(2),
-      date: z.string().date(),
-      notes: z.string().optional(),
-      tripId: z.string().optional(),
-      paymentMethod: z.enum(["cash", "personal_card", "company_card", "bank_transfer", "other"]).optional(),
-      status: z.enum(["draft", "submitted"]).default("draft"),
-    }).parse(Object.fromEntries(formData.entries()));
-    const receipt = formData.get("receipt");
     const client = await api();
-    const uploadedReceipt =
-      receipt instanceof File && receipt.size > 0
-        ? await client.storage.upload(receipt, "receipts")
-        : null;
-
-    const expense = await client.expenses.create({
-      merchant: input.merchant,
-      amount: input.amount,
-      currency: input.currency,
-      category: input.category,
-      expenseDate: input.date,
-      notes: input.notes,
-      tripId: input.tripId || undefined,
-      paymentMethod: input.paymentMethod || undefined,
-      receiptFileUrl: uploadedReceipt?.url,
-    });
-    if (input.status === "submitted") {
-      await client.expenses.submit(expense.id);
-    }
-    revalidatePath(await wsPath("traveler", "/expenses"));
+    const { input, body } = await readExpenseForm(formData, client);
+    const expense = await client.expenses.create(body);
+    if (input.status === "submitted") await client.expenses.submit(expense.id);
+    await revalidateExpensePaths(body.tripId);
     return { success: true };
+  } catch (e) { return { error: errMsg(e) }; }
+}
+
+export async function updateExpenseDialogAction(_: DialogState, formData: FormData): Promise<DialogState> {
+  try {
+    const id = String(formData.get("id") ?? "");
+    if (!id) return { error: "Missing expense." };
+    const client = await api();
+    const { input, body } = await readExpenseForm(formData, client);
+    await client.expenses.update(id, body);
+    if (input.status === "submitted") await client.expenses.submit(id);
+    await revalidateExpensePaths(body.tripId);
+    return { success: true };
+  } catch (e) { return { error: errMsg(e) }; }
+}
+
+export async function deleteExpenseAction(_: DialogState, formData: FormData): Promise<DialogState> {
+  try {
+    const id = String(formData.get("id") ?? "");
+    await (await api()).expenses.delete(id);
+    await revalidateExpensePaths(String(formData.get("tripId") ?? "") || null);
+    return { success: true };
+  } catch (e) { return { error: errMsg(e) }; }
+}
+
+export async function submitDraftsAction(_: DialogState, formData: FormData): Promise<DialogState> {
+  try {
+    const ids = formData.getAll("ids").map(String).filter(Boolean);
+    if (ids.length === 0) return { error: "Nothing to submit." };
+    const client = await api();
+    const results = await Promise.allSettled(ids.map((id) => client.expenses.submit(id)));
+    await revalidateExpensePaths();
+    const failed = results.filter((r) => r.status === "rejected").length;
+    return failed > 0
+      ? { error: `${ids.length - failed} submitted, ${failed} could not be submitted.` }
+      : { success: true, message: `${ids.length} expense${ids.length === 1 ? "" : "s"} submitted for review.` };
   } catch (e) { return { error: errMsg(e) }; }
 }
 
@@ -183,11 +238,7 @@ export async function submitExpenseAction(_: DialogState, formData: FormData): P
   try {
     const id = String(formData.get("id") ?? "");
     await (await api()).expenses.submit(id);
-    const tripId = formData.get("tripId");
-    const path = tripId
-      ? await wsPath("traveler", `/trips/${tripId}`)
-      : await wsPath("traveler", "/expenses");
-    revalidatePath(path);
+    await revalidateExpensePaths(String(formData.get("tripId") ?? "") || null);
     return { success: true };
   } catch (e) { return { error: errMsg(e) }; }
 }
@@ -196,10 +247,29 @@ export async function reviewExpenseDialogAction(_: DialogState, formData: FormDa
   try {
     const id = String(formData.get("id") ?? "");
     const status = z.enum(["approved", "rejected", "reimbursed"]).parse(String(formData.get("status") ?? ""));
-    await (await api()).expenses.review(id, status);
-    const tripId = formData.get("tripId");
-    const path = tripId ? await wsPath("admin", `/trips/${tripId}`) : await wsPath("admin");
-    revalidatePath(path);
+    const notes = String(formData.get("notes") ?? "").trim();
+    await (await api()).expenses.review(id, status, notes || undefined);
+    const tripId = String(formData.get("tripId") ?? "") || null;
+    await revalidateExpensePaths(tripId);
+    revalidatePath(await wsPath("admin"));
     return { success: true };
+  } catch (e) { return { error: errMsg(e) }; }
+}
+
+export async function bulkReviewExpensesAction(_: DialogState, formData: FormData): Promise<DialogState> {
+  try {
+    const ids = formData.getAll("ids").map(String).filter(Boolean);
+    const status = z.enum(["approved", "rejected", "reimbursed"]).parse(String(formData.get("status") ?? ""));
+    const notes = String(formData.get("notes") ?? "").trim();
+    const result = await (await api()).expenses.bulkReview(ids, status, notes || undefined);
+    await revalidateExpensePaths();
+    revalidatePath(await wsPath("admin"));
+    const verb = status === "reimbursed" ? "marked paid" : status;
+    if (result.failed.length > 0) {
+      return {
+        error: `${result.updated} ${verb}. ${result.failed.length} skipped: ${result.failed[0].error}.`,
+      };
+    }
+    return { success: true, message: `${result.updated} expense${result.updated === 1 ? "" : "s"} ${verb}.` };
   } catch (e) { return { error: errMsg(e) }; }
 }

@@ -30,7 +30,9 @@ export default async function TravelerTripDetailPage({ params }: { params: Promi
 
   const documents = allDocuments.filter((d) => d.tripId === tripId);
   const approval = approvals[0];
-  const total = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+  const total = expenses
+    .filter((e) => e.currency === trip.currency && e.status !== "rejected")
+    .reduce((sum, e) => sum + Number(e.amount), 0);
   const canRequestApproval = !approval || approval.status === "rejected" || approval.status === "cancelled";
   const isAssigned = travelers.some((t) => t.userId === currentUser.id);
 

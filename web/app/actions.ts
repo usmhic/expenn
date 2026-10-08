@@ -8,17 +8,6 @@ import { apiClient, ApiError, type AuthResponse } from "@/lib/api-client";
 import { getSignedInRedirect, getSignedInState } from "@/server/auth-redirect";
 import { roleHome } from "@/server/workspace";
 
-const expenseSchema = z.object({
-  merchant: z.string().min(2),
-  amount: z.coerce.number().positive(),
-  currency: z.string().min(3).max(5),
-  category: z.string().min(2),
-  date: z.string().date(),
-  notes: z.string().optional(),
-  tripId: z.string().optional(),
-  receiptFileUrl: z.string().url().optional(),
-});
-
 const documentSchema = z.object({
   title: z.string().min(1).max(255),
   kind: z.enum([
@@ -155,37 +144,6 @@ export async function switchOrgAction(formData: FormData) {
   redirect(["owner", "admin", "manager"].includes(role) ? `/${slug}/admin` : `/${slug}/traveler`);
 }
 
-export async function createExpenseAction(formData: FormData) {
-  const state = await getSignedInState(await headers());
-  if (!state) redirect("/login?error=session-required");
-  let errMsg: string | null = null;
-  try {
-    const input = expenseSchema.parse(Object.fromEntries(formData.entries()));
-    const receipt = formData.get("receipt");
-    const client = await api();
-    const uploadedReceipt =
-      receipt instanceof File && receipt.size > 0
-        ? await client.storage.upload(receipt, "receipts")
-        : null;
-    await client.expenses.create({
-      merchant: input.merchant,
-      amount: input.amount,
-      currency: input.currency,
-      category: input.category,
-      expenseDate: input.date,
-      notes: input.notes,
-      tripId: input.tripId || undefined,
-      receiptFileUrl: uploadedReceipt?.url ?? input.receiptFileUrl,
-    });
-  } catch (e) {
-    errMsg = actionError(e);
-  }
-  const expensesPath = await currentWorkspacePath("traveler", "/expenses");
-  if (errMsg) redirect(`${expensesPath}?error=${encodeURIComponent(errMsg)}`);
-  revalidatePath(expensesPath);
-  redirect(`${expensesPath}?created=1`);
-}
-
 export async function createDocumentAction(formData: FormData) {
   const state = await getSignedInState(await headers());
   if (!state) redirect("/login?error=session-required");
@@ -210,20 +168,4 @@ export async function createDocumentAction(formData: FormData) {
   if (errMsg) redirect(`${documentsPath}?error=${encodeURIComponent(errMsg)}`);
   revalidatePath(documentsPath);
   redirect(`${documentsPath}?created=1`);
-}
-
-export async function previewReceiptExtractionAction() {
-  return {
-    merchant: "Demo Merchant",
-    total: 42.7,
-    tax: 3.2,
-    date: "2026-05-09",
-    currency: "USD",
-    lineItems: [
-      { label: "Meal", amount: 31.5 },
-      { label: "Tip", amount: 11.2 },
-    ],
-    confidenceScore: 0.88,
-    message: "AI extraction pending. Demo values loaded.",
-  };
 }

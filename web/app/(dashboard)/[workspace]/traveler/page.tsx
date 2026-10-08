@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { Camera, MapPin, Send, AlertTriangle, TrendingUp } from "lucide-react";
+import { Camera, MapPin, Send, AlertTriangle, TrendingUp, Undo2 } from "lucide-react";
 import { cookies } from "next/headers";
 import { AppShell, StatusBadge } from "@/components/layout/navigation";
 import { CreateExpenseDialog } from "@/components/dialogs";
 import { HeroStat } from "@/components/ui/hero-stat";
 import { apiClient } from "@/lib/api-client";
+import { formatMoney, formatTotals, pick } from "@/lib/expenses";
 
 function fmt(date: string | Date) {
   const dateObj = typeof date === "string" ? new Date(date) : date;
@@ -15,18 +16,24 @@ export default async function TravelerHomePage({ params }: { params: Promise<{ w
   const { workspace } = await params;
   const root = `/${workspace}/traveler`;
   const api = apiClient({ cookie: (await cookies()).toString() });
-  const [trips, expenses, approvals] = await Promise.all([
+  const [trips, expenses, approvals, summary] = await Promise.all([
     api.trips.list({ mine: true }),
     api.expenses.list({ mine: true }),
     api.trips.getApprovals({ mine: true }),
+    api.expenses.summary(),
   ]);
 
   const activeTrip = trips.find((t) => t.status === "active") ?? trips[0];
   const activeApproval = activeTrip ? approvals.find((a) => a.tripId === activeTrip.id) : undefined;
-  const tripExpenses = activeTrip ? expenses.filter((e) => e.tripId === activeTrip.id) : [];
+  const tripExpenses = activeTrip
+    ? expenses.filter((e) => e.tripId === activeTrip.id && e.currency === activeTrip.currency && e.status !== "rejected")
+    : [];
   const spent = tripExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
   const recentExpenses = expenses.slice(0, 5);
-  const missingReceipts = expenses.filter((e) => !e.receiptFileUrl).length;
+  // Only nag about receipts the traveler can still attach.
+  const missingReceipts = expenses.filter((e) => !e.receiptFileUrl && (e.status === "draft" || e.status === "rejected")).length;
+  const sentBack = expenses.filter((e) => e.status === "rejected").length;
+  const owed = formatTotals(pick(summary.byCurrency, "owed"), "");
 
   return (
     <AppShell role="traveler" breadcrumbs={[{ label: "Home" }]}>
@@ -40,7 +47,7 @@ export default async function TravelerHomePage({ params }: { params: Promise<{ w
             <Link href={`${root}/capture`} className="primary-button rounded-md text-sm">
               <Camera className="size-4" /> Capture
             </Link>
-            <CreateExpenseDialog trips={trips} />
+            <CreateExpenseDialog trips={trips} defaultCurrency={expenses[0]?.currency} />
           </div>
         </div>
 
@@ -55,16 +62,36 @@ export default async function TravelerHomePage({ params }: { params: Promise<{ w
                 {activeTrip.destination} · {fmt(activeTrip.startDate)} – {fmt(activeTrip.endDate)}
               </p>
             ) : (
-              <p className="mt-1 text-sm text-muted-foreground">Your admin will assign a trip to you.</p>
+              <p className="mt-1 text-sm text-muted-foreground">No trip right now — you can still log everyday expenses.</p>
             )}
           </div>
           {activeTrip && (
             <div className="flex flex-wrap gap-2 sm:shrink-0">
               <HeroStat label="Approval" value={activeApproval?.status ?? "Not requested"} highlight={activeApproval?.status === "approved"} />
-              <HeroStat label="Spent" value={`${activeTrip.currency} ${spent.toFixed(0)}`} />
+              <HeroStat label="Spent" value={formatMoney(spent, activeTrip.currency, { compact: true })} />
             </div>
           )}
         </article>
+
+        {owed && (
+          <Link
+            href={`${root}/expenses?status=approved`}
+            className="flex items-center justify-between gap-3 rounded-lg border border-primary/25 bg-primary/5 px-4 py-2.5 text-sm transition-colors hover:bg-primary/10"
+          >
+            <span>Approved and on its way back to you</span>
+            <strong className="tabular-nums text-primary">{owed}</strong>
+          </Link>
+        )}
+
+        {sentBack > 0 && (
+          <Link
+            href={`${root}/expenses?status=rejected`}
+            className="flex items-center gap-3 rounded-lg border border-rose-200 bg-rose-50/80 px-3 py-2.5 text-sm text-rose-800 transition-colors hover:bg-rose-100/80 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200"
+          >
+            <Undo2 className="size-4 shrink-0" />
+            <span><strong>{sentBack}</strong> expense{sentBack === 1 ? " needs" : "s need"} a fix before you can be paid</span>
+          </Link>
+        )}
 
         {/* Alert: missing receipts */}
         {missingReceipts > 0 && (
@@ -92,12 +119,10 @@ export default async function TravelerHomePage({ params }: { params: Promise<{ w
           <article className="card p-0">
             <div className="flex items-center justify-between gap-3 px-4 pt-4 pb-2">
               <h2 className="text-sm font-semibold">My trips</h2>
-              {trips.length > 5 && (
-                <Link href={`${root}/trips`} className="text-xs font-semibold text-primary hover:underline">All trips</Link>
-              )}
+              <span className="text-xs text-muted-foreground">{trips.length}</span>
             </div>
-            <div className="divide-y divide-border/60">
-              {trips.slice(0, 5).map((trip) => {
+            <div className="max-h-80 divide-y divide-border/60 overflow-y-auto">
+              {trips.map((trip) => {
                 const approval = approvals.find((a) => a.tripId === trip.id);
                 return (
                   <Link key={trip.id} href={`${root}/trips/${trip.id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-secondary/50 transition-colors">
@@ -135,7 +160,7 @@ export default async function TravelerHomePage({ params }: { params: Promise<{ w
                     <span className="block truncate text-xs text-muted-foreground">{e.category} · {fmt(e.expenseDate)}</span>
                   </span>
                   <span className="text-right shrink-0">
-                    <span className="block text-sm font-semibold">{e.currency} {Number(e.amount).toFixed(2)}</span>
+                    <span className="block text-sm font-semibold tabular-nums">{formatMoney(e.amount, e.currency)}</span>
                     <StatusBadge value={e.status} />
                   </span>
                 </div>

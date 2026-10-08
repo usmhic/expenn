@@ -1,67 +1,84 @@
 ---
 title: Expenses
-description: Capturing receipts, submitting expenses, and the review queue
+description: Capturing receipts, submitting expenses, fixing rejections, and the review & pay queue
 ---
 
-Expenses are the core of expenn. A traveler creates them, optionally attaches a receipt photo, and submits them for review. An admin or manager approves or rejects — and the traveler gets notified.
+Expenses are the core of expenn. A traveler captures a receipt, submits it, and a reviewer approves it and marks it paid. Every step is visible to both sides, so nobody has to ask "where's my money?".
+
+```
+draft ──▶ submitted ──▶ approved ──▶ paid (reimbursed)
+              │
+              └──▶ sent back (rejected) ──▶ fix ──▶ resubmit
+```
 
 ## Creating an expense
 
 ### On web
 
-Go to **My expenses → New expense**. Fill in:
+Use **Capture** in the sidebar or **Add expense** on the Expenses page. The form starts with the receipt:
 
-- **Merchant** — who you paid (required)
-- **Amount & currency** (required)
-- **Date** — defaults to today
-- **Category** — Travel, Accommodation, Meals, Transport, Communication, Office, Entertainment, Other
-- **Trip** — the trip this expense belongs to (optional but recommended)
-- **Notes** — any context for the reviewer
-- **Receipt** — upload a photo or PDF of the receipt
+- **Receipt** — tap to take a photo or choose a file, or drag a photo or PDF onto the drop zone
+- **Amount & currency** — the currency follows the trip you pick, unless you change it
+- **Merchant** and **Date** — the date defaults to today
+- **Category** — Meals, Lodging, Airfare, Ground transport, Mileage, Fuel, Conference & training, Client entertainment, Office & supplies, Software, Phone & internet, Other
+- **Trip** — your active trip is selected for you; choose **No trip** for everyday spend
+- **Paid with** — choosing **Company card** turns off **Pay me back**, because the company already paid
+- **Notes** — business purpose, attendees, anything the reviewer needs
 
-The expense is created as a **draft** — it won't appear in the review queue until you submit it.
+Then choose **Save draft** to finish later, or **Submit for review** to send it now. On the Capture page the form clears after each save so you can work through a stack of receipts.
 
 ### On mobile
 
-Use the **Scan** tab — point the camera at a receipt, fill in the details on the form below, and tap **Save expense**. The camera captures a photo and attaches it automatically.
+Use the **Scan** tab — point the camera at a receipt, fill in the details, and tap **Save expense**.
 
 ## Expense statuses
 
 | Status | Meaning |
 |---|---|
-| `draft` | Created but not submitted — only visible to you |
-| `submitted` | Sent for review — visible to admins and managers |
-| `approved` | Accepted by a reviewer |
-| `rejected` | Rejected with a note — edit and resubmit if needed |
-| `reimbursed` | Payment confirmed — fully resolved |
+| `draft` | Saved but not submitted — only visible to you; you can edit or delete it |
+| `submitted` | Waiting for a reviewer — it can't be edited while it is being reviewed |
+| `rejected` | Sent back with a reason — edit it and resubmit |
+| `approved` | Accepted; reimbursable expenses now count as **owed to you** |
+| `reimbursed` | Paid out — fully resolved |
 
-## Submitting expenses
+## Submitting and fixing
 
-From the expense list, tap **Submit** on any draft expense. You can also bulk-submit all drafts at once with the **Submit all drafts** button.
+- **Submit** sends one draft. **Submit all** on the Expenses page sends every draft at once.
+- When a reviewer sends an expense back, it appears in red with their reason, and the bell shows it. Click **Fix**, make the change, and click **Resubmit**.
+- The tiles at the top of the Expenses page show what is **owed to you**, what is **in review**, and what has been **paid back**. Amounts in different currencies are shown side by side, never added together.
 
-<Callout type="warn">
-  Once submitted you can no longer edit the expense. If you need to make a
-  change, ask your admin to reject it — then edit and resubmit.
-</Callout>
+## Review & pay (admins and managers)
 
-## The review queue (admin & manager)
+Open **Review** in the admin sidebar. The page has five tabs:
 
-Go to **Expenses** in the admin nav. All submitted expenses appear here, sorted by submission date. For each expense you can:
+| Tab | What it holds |
+|---|---|
+| **To review** | Submitted expenses, oldest first |
+| **To pay** | Approved expenses that haven't been paid yet |
+| **Paid** | Reimbursed expenses |
+| **Sent back** | Rejected expenses the traveler still has to fix |
+| **All** | Everything that has been submitted |
 
-- **Approve** — marks as approved, notifies the traveler
-- **Reject** — requires a rejection reason, sends the expense back to draft
-- **View receipt** — opens the attached image or PDF
-- **Filter** by traveler, trip, status, category, or date range
+To decide on several expenses at once, tick them (or use **Select all**) and choose **Approve**, **Send back**, or **Mark paid**. **Select … without issues** ticks every expense that has a receipt and no duplicate warning, so routine items take one click.
 
-Managers only see expenses from travelers in their team.
+Sending an expense back always asks for a reason — the traveler sees it next to the expense.
 
-## Missing receipts
+### Review hints
 
-Any expense without an attached receipt shows a warning on the traveler's mobile home screen. The **Missing** stat chip on the home screen shows a count — tap it to go to the expense list pre-filtered to missing-receipt items.
+expenn flags expenses that deserve a second look. Flags never block a decision.
+
+- **No receipt** — nothing is attached.
+- **Possible duplicate** — the same person has another expense with the same amount, currency, and date.
+
+### Paying out and exporting
+
+After you've paid travelers (through payroll or a bank transfer batch), select the expenses on **To pay** and choose **Mark paid**. **Export CSV** downloads the expenses in the current tab, with traveler, email, category, amount, currency, reviewer, review note, and timestamps. Spreadsheets, QuickBooks, and Xero can import the file.
 
 ## Analytics
 
-The **Analytics** page (admin/owner only) shows:
-- Total spend by trip, traveler, and category
-- Month-over-month trend
-- Pending vs. approved breakdown
+The **Analytics** page (admins and owners) shows, for one year and one currency at a time:
+
+- Approved spend, with what is still waiting for review
+- Budget used across trips, with an **Over budget** warning
+- **Time to decision** and **time to reimburse** — how long travelers wait
+- Monthly spend, top categories, top spenders, and each trip against its budget

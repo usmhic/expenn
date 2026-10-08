@@ -16,6 +16,8 @@ internal static class ExpensesPersistence
             entity.HasIndex(x => new { x.UserId, x.ExpenseDate }).HasDatabaseName("expenses_user_date_idx");
             entity.HasOne(x => x.Organization).WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.ReviewedBy).WithMany().HasForeignKey(x => x.ReviewedById).OnDelete(DeleteBehavior.SetNull);
+            entity.Property(x => x.ReviewNote).HasMaxLength(1000);
             entity.HasOne(x => x.Trip).WithMany(x => x.Expenses).HasForeignKey(x => x.TripId).OnDelete(DeleteBehavior.SetNull);
         });
 

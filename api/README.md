@@ -170,12 +170,22 @@ All auth flows return:
 ### Expenses
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/expenses` | List expenses (`?status=&tripId=&mine=true`) |
+| GET | `/api/expenses` | List expenses (`?status=&tripId=&mine=true&from=&to=`), with review flags |
 | POST | `/api/expenses` | Create expense (draft) |
 | GET | `/api/expenses/{id}` | Get expense |
+| PUT | `/api/expenses/{id}` | Edit a draft or rejected expense (rejected returns to draft) |
+| DELETE | `/api/expenses/{id}` | Soft-delete a draft or rejected expense |
 | POST | `/api/expenses/{id}/submit` | Submit draft for review |
-| PATCH | `/api/expenses/{id}/review` | Approve / reject / reimburse |
-| GET | `/api/expenses/summary` | Counts + totals by status |
+| PATCH | `/api/expenses/{id}/review` | Approve / reject (reason required) / reimburse |
+| POST | `/api/expenses/review` | Bulk review `{ ids, status, notes }`; invalid items are skipped and reported |
+| GET | `/api/expenses/summary` | Counts by status and totals per currency (pending, owed, reimbursed) |
+| GET | `/api/expenses/export` | CSV export; same filters and visibility as the list |
+
+Status changes follow `Domain/Expenses/ExpenseWorkflow.cs`:
+`draft → submitted → approved → reimbursed`, and `submitted → rejected → draft`
+(after an edit). Any other transition returns `400`. `ExpenseFlags` adds non-blocking
+review hints (`missing_receipt`, `possible_duplicate`). Money is never summed across
+currencies in summaries or analytics.
 
 ### Documents
 | Method | Path | Description |
@@ -190,11 +200,11 @@ All auth flows return:
 |---|---|---|
 | GET | `/api/comments?tripId=` | Comments for a trip |
 | POST | `/api/comments` | Add comment |
-| GET | `/api/analytics/overview` | Spend by status + by month |
-| GET | `/api/analytics/spend-by-group` | Spend by team |
+| GET | `/api/analytics/overview` | Per-currency spend, budgets, categories, months, trips, top spenders, cycle times (`?year=&month=`) |
+| GET | `/api/analytics/spend-by-group` | Spend by team and currency |
 | POST | `/api/storage/upload` | Upload file → returns URL |
 | GET | `/api/search?q=` | Full-text search (trips + expenses) |
-| GET | `/api/notifications` | Pending approval / expense counts |
+| GET | `/api/notifications` | Action counts: approvals, expenses to review/pay, own sent-back and draft expenses |
 | GET | `/health` | Health check (`{ status, timestamp, environment }`) |
 
 ## Architecture overview
