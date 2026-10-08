@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { AppShell, StatusBadge } from "@/components/layout/navigation";
 import { BulkApproveButtons, CreateTripDialog, ReviewApprovalButtons } from "@/components/dialogs";
 import { apiClient } from "@/lib/api-client";
+import { formatMoney } from "@/lib/expenses";
 
 function formatDate(date: string | Date) {
   const dateObj = typeof date === "string" ? new Date(date) : date;
@@ -91,7 +92,7 @@ export default async function AdminDashboardPage({
                         {team.name}
                       </Link>
                     </div>
-                    <span className="text-xs text-muted-foreground">{members.length} member{members.length === 1 ? "" : "s"}</span>
+                    <span className="text-xs text-muted-foreground">{teamTrips.length} trip{teamTrips.length === 1 ? "" : "s"}</span>
                   </div>
                   <div className="divide-y divide-border/60">
                     {teamTrips.map((trip) => {
@@ -199,7 +200,7 @@ export default async function AdminDashboardPage({
             {pendingExpenses.length > 0 && (
               <article className="card p-0">
                 <div className="flex items-center justify-between gap-3 px-4 pt-3 pb-2 border-b border-border/60">
-                  <h2 className="text-sm font-semibold">Expense review</h2>
+                  <Link href={`${adminRoot}/expenses`} className="text-sm font-semibold hover:text-primary">Expense review</Link>
                   <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-400/15 dark:text-blue-200">
                     {pendingExpenses.length}
                   </span>
@@ -208,19 +209,21 @@ export default async function AdminDashboardPage({
                   {pendingExpenses.slice(0, 5).map((e) => (
                     <Link
                       key={e.id}
-                      href={e.tripId ? `${adminRoot}/trips/${e.tripId}` : adminRoot}
+                      href={`${adminRoot}/expenses`}
                       className="flex items-center gap-3 px-4 py-2.5 hover:bg-secondary/50 transition-colors"
                     >
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-semibold">{e.merchant}</p>
                         <p className="truncate text-xs text-muted-foreground">{e.travelerName} · {e.category}</p>
                       </div>
-                      <span className="text-sm font-semibold shrink-0">{e.currency} {Number(e.amount).toFixed(2)}</span>
+                      <span className="text-sm font-semibold shrink-0 tabular-nums">{formatMoney(e.amount, e.currency)}</span>
                     </Link>
                   ))}
                 </div>
                 {pendingExpenses.length > 5 && (
-                  <p className="px-4 py-2 text-xs text-muted-foreground">+{pendingExpenses.length - 5} more — open a trip to review</p>
+                  <Link href={`${adminRoot}/expenses`} className="block px-4 py-2 text-xs font-semibold text-primary hover:underline">
+                    Review all {pendingExpenses.length} →
+                  </Link>
                 )}
               </article>
             )}

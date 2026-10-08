@@ -72,6 +72,9 @@ builder.Services
     })
     .AddJwtBearer(options =>
     {
+        // Keep JWT claim names as issued ("sub", "role", "org_id"). The default mapping renames
+        // "sub" and "role" to long ClaimTypes URIs, which the controllers do not read.
+        options.MapInboundClaims = false;
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,

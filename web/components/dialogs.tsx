@@ -4,13 +4,16 @@ import { startTransition, useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
-  Check, MapPin, Plus, Send, Shield, Users, UserPlus, Wallet, X,
+  Banknote, Check, MapPin, Pencil, Plus, Send, Shield, Trash2, Users, UserPlus, Wallet, X,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { DateButton } from "@/components/ui/date-button";
+import { ExpenseFormFields, type ExpenseFormTrip } from "@/components/expense-form";
+import type { ExpenseDto } from "@/lib/api-client";
+import { cn } from "@/lib/utils";
 import {
   addToTeamDialogAction,
   assignTravelersDialogAction,
@@ -18,11 +21,14 @@ import {
   createExpenseDialogAction,
   createTeamDialogAction,
   createTripDialogAction,
+  deleteExpenseAction,
   inviteMemberDialogAction,
   requestApprovalDialogAction,
   reviewApprovalDialogAction,
   reviewExpenseDialogAction,
+  submitDraftsAction,
   submitExpenseAction,
+  updateExpenseDialogAction,
   type DialogState,
 } from "@/app/dialog-actions";
 
@@ -185,20 +191,45 @@ export function CreateTripDialog({
   );
 }
 
-/* ── Create Expense ──────────────────────────────────────────────────────── */
-export function CreateExpenseDialog({ trips }: { trips: { id: string; name: string }[] }) {
+/* ── Expense form dialogs ────────────────────────────────────────────────── */
+function ExpenseFormFooter({ onClose, resubmit }: { onClose: () => void; resubmit?: boolean }) {
+  return (
+    <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+      <button type="button" className="secondary-button rounded-lg text-sm" onClick={onClose}>
+        Cancel
+      </button>
+      <SubmitButton name="status" value="draft" pendingText="Saving…" className="secondary-button rounded-lg text-sm">
+        Save draft
+      </SubmitButton>
+      <SubmitButton name="status" value="submitted" pendingText="Sending…" className="primary-button rounded-lg text-sm">
+        <Send className="size-4" /> {resubmit ? "Resubmit" : "Submit for review"}
+      </SubmitButton>
+    </div>
+  );
+}
+
+export function CreateExpenseDialog({
+  trips,
+  defaultCurrency,
+}: {
+  trips: ExpenseFormTrip[];
+  defaultCurrency?: string;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [submitNow, setSubmitNow] = useState(false);
+  const [formKey, setFormKey] = useState(0);
   const [state, action] = useActionState(createExpenseDialogAction, null as DialogState);
 
   useEffect(() => {
     if (state?.success) {
-      startTransition(() => setOpen(false));
+      startTransition(() => {
+        setOpen(false);
+        setFormKey((k) => k + 1);
+      });
       router.refresh();
-      toast.success(submitNow ? "Expense submitted for review." : "Expense saved as draft.");
+      toast.success("Expense saved.");
     }
-  }, [state?.success, router, submitNow]);
+  }, [state, router]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -207,7 +238,7 @@ export function CreateExpenseDialog({ trips }: { trips: { id: string; name: stri
           <Plus className="size-4" /> Add expense
         </button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base font-semibold">
             <span className="flex size-7 items-center justify-center rounded-md bg-gradient-primary text-primary-foreground">
@@ -216,79 +247,127 @@ export function CreateExpenseDialog({ trips }: { trips: { id: string; name: stri
             Add expense
           </DialogTitle>
         </DialogHeader>
-        <form action={action} className="grid gap-3">
+        <form key={formKey} action={action} className="grid gap-3">
           {state?.error && <ErrorBanner message={state.error} />}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="grid gap-1 text-sm font-medium">
-              Merchant
-              <input name="merchant" required placeholder="e.g. Marriott Hotel" className="form-control font-normal" />
-            </label>
-            <label className="grid gap-1 text-sm font-medium">
-              Amount
-              <input name="amount" type="number" min="0.01" step="0.01" required placeholder="0.00" className="form-control font-normal" />
-            </label>
-            <label className="grid gap-1 text-sm font-medium">
-              Currency
-              <input name="currency" required defaultValue="USD" className="form-control font-normal uppercase" />
-            </label>
-            <label className="grid gap-1 text-sm font-medium">
-              Category
-              <input name="category" required placeholder="e.g. Meals" className="form-control font-normal" />
-            </label>
-            <label className="grid gap-1 text-sm font-medium">
-              Date
-              <DateButton name="date" required placeholder="Expense date" className="w-full" />
-            </label>
-            <label className="grid gap-1 text-sm font-medium col-span-2 sm:col-span-1">
-              Trip
-              <select name="tripId" required={trips.length > 0} className="form-control font-normal">
-                {trips.length > 0 ? (
-                  <>
-                    <option value="">Select a trip…</option>
-                    {trips.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </>
-                ) : (
-                  <option value="">No trips assigned</option>
-                )}
-              </select>
-              {trips.length === 0 && (
-                <span className="text-xs text-amber-600 dark:text-amber-400">You need a trip assignment before adding expenses.</span>
-              )}
-            </label>
-          </div>
-          <label className="grid gap-1 text-sm font-medium">
-            Payment method
-            <select name="paymentMethod" className="form-control font-normal">
-              <option value="">Select…</option>
-              <option value="personal_card">Personal card</option>
-              <option value="company_card">Company card</option>
-              <option value="cash">Cash</option>
-              <option value="bank_transfer">Bank transfer</option>
-              <option value="other">Other</option>
-            </select>
-          </label>
-          <label className="grid gap-1 text-sm font-medium">
-            Receipt (photo or PDF)
-            <input name="receipt" type="file" accept="image/*,application/pdf" className="form-control font-normal" />
-          </label>
-          <label className="grid gap-1 text-sm font-medium">
-            Notes
-            <textarea name="notes" placeholder="Optional notes for the reviewer" className="form-control min-h-16 font-normal" />
-          </label>
-          <input type="hidden" name="status" value={submitNow ? "submitted" : "draft"} />
-          <label className="flex items-center gap-2 cursor-pointer select-none rounded-md border border-border bg-secondary/40 px-3 py-2 text-sm">
-            <input
-              type="checkbox"
-              checked={submitNow}
-              onChange={(e) => setSubmitNow(e.target.checked)}
-              className="size-4 rounded accent-primary"
-            />
-            <span>Submit for review immediately</span>
-          </label>
-          <DialogFooterRow onClose={() => setOpen(false)} />
+          <ExpenseFormFields trips={trips} defaultCurrency={defaultCurrency} />
+          <ExpenseFormFooter onClose={() => setOpen(false)} />
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+export function EditExpenseDialog({ expense, trips }: { expense: ExpenseDto; trips: ExpenseFormTrip[] }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [state, action] = useActionState(updateExpenseDialogAction, null as DialogState);
+  const rejected = expense.status === "rejected";
+
+  useEffect(() => {
+    if (state?.success) {
+      startTransition(() => setOpen(false));
+      router.refresh();
+      toast.success("Expense updated.");
+    }
+  }, [state, router]);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "secondary-button min-h-7 rounded-md px-2.5 py-0.5 text-xs font-semibold",
+            rejected && "text-rose-700 dark:text-rose-300"
+          )}
+        >
+          <Pencil className="size-3.5" /> {rejected ? "Fix" : "Edit"}
+        </button>
+      </DialogTrigger>
+      <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-base font-semibold">{rejected ? "Fix and resubmit" : "Edit expense"}</DialogTitle>
+        </DialogHeader>
+        <form action={action} className="grid gap-3">
+          <input type="hidden" name="id" value={expense.id} />
+          {expense.reviewNote && rejected && (
+            <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200">
+              <span className="font-semibold">{expense.reviewedByName ?? "Reviewer"}:</span> {expense.reviewNote}
+            </div>
+          )}
+          {state?.error && <ErrorBanner message={state.error} />}
+          <ExpenseFormFields trips={trips} expense={expense} />
+          <ExpenseFormFooter onClose={() => setOpen(false)} resubmit={rejected} />
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function DeleteExpenseButton({ expenseId, tripId }: { expenseId: string; tripId?: string }) {
+  const router = useRouter();
+  const [state, action] = useActionState(deleteExpenseAction, null as DialogState);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  useEffect(() => {
+    if (state?.success) {
+      startTransition(() => setConfirmOpen(false));
+      router.refresh();
+      toast.success("Expense deleted.");
+    }
+    if (state?.error) toast.error(state.error);
+  }, [state, router]);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setConfirmOpen(true)}
+        className="icon-button size-7 text-muted-foreground hover:text-rose-600"
+        aria-label="Delete expense"
+        title="Delete"
+      >
+        <Trash2 className="size-3.5" />
+      </button>
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        title="Delete this expense?"
+        description="It will be removed from your expenses. Submitted expenses can't be deleted."
+        confirmLabel="Delete"
+        confirmClassName="secondary-button rounded-lg text-sm text-rose-600 dark:text-rose-400"
+      >
+        <form action={action}>
+          <input type="hidden" name="id" value={expenseId} />
+          {tripId && <input type="hidden" name="tripId" value={tripId} />}
+          <SubmitButton pendingText="Deleting…" className="secondary-button rounded-lg text-sm text-rose-600 dark:text-rose-400">
+            Delete
+          </SubmitButton>
+        </form>
+      </ConfirmDialog>
+    </>
+  );
+}
+
+export function SubmitDraftsButton({ draftIds }: { draftIds: string[] }) {
+  const router = useRouter();
+  const [state, action] = useActionState(submitDraftsAction, null as DialogState);
+
+  useEffect(() => {
+    if (state?.success) {
+      router.refresh();
+      toast.success(state.message ?? "Submitted.");
+    }
+    if (state?.error) toast.error(state.error);
+  }, [state, router]);
+
+  return (
+    <form action={action}>
+      {draftIds.map((id) => <input key={id} type="hidden" name="ids" value={id} />)}
+      <SubmitButton pendingText="Submitting…" className="primary-button min-h-8 rounded-md px-3 text-xs">
+        <Send className="size-3.5" /> Submit all {draftIds.length}
+      </SubmitButton>
+    </form>
   );
 }
 
@@ -766,102 +845,157 @@ export function SubmitExpenseButton({ expenseId, tripId }: { expenseId: string; 
   );
 }
 
-/* ── Review Expense (with confirmation dialogs) ───────────────────────────── */
-export function ReviewExpenseButtons({ expenseId, tripId }: { expenseId: string; tripId?: string }) {
+/* ── Review Expense ──────────────────────────────────────────────────────── */
+export function ReviewExpenseButtons({
+  expenseId,
+  tripId,
+  status,
+}: {
+  expenseId: string;
+  tripId?: string;
+  status: string;
+}) {
   const router = useRouter();
-  const [approveState, approveAction] = useActionState(reviewExpenseDialogAction, null as DialogState);
-  const [rejectState, rejectAction] = useActionState(reviewExpenseDialogAction, null as DialogState);
-  const [reimburseState, reimburseAction] = useActionState(reviewExpenseDialogAction, null as DialogState);
-  const [confirmOpen, setConfirmOpen] = useState<"approve" | "reject" | "reimburse" | null>(null);
+  const [state, action] = useActionState(reviewExpenseDialogAction, null as DialogState);
+  const [open, setOpen] = useState<"approved" | "rejected" | "reimbursed" | null>(null);
 
   useEffect(() => {
-    if (approveState?.success || rejectState?.success || reimburseState?.success) {
-      startTransition(() => setConfirmOpen(null));
+    if (state?.success) {
+      startTransition(() => setOpen(null));
       router.refresh();
     }
-  }, [approveState?.success, rejectState?.success, reimburseState?.success, router]);
+  }, [state, router]);
 
-  const error = approveState?.error ?? rejectState?.error ?? reimburseState?.error;
+  if (status !== "submitted" && status !== "approved") return null;
 
   return (
     <div className="flex flex-wrap gap-1.5">
-      {error && <span className="w-full text-xs text-rose-600">{error}</span>}
+      {status === "submitted" ? (
+        <>
+          <button
+            type="button"
+            onClick={() => setOpen("approved")}
+            className="secondary-button min-h-7 rounded-md px-2 py-0.5 text-xs text-teal-700 dark:text-teal-400"
+          >
+            <Check className="size-3.5" /> Approve
+          </button>
+          <button
+            type="button"
+            onClick={() => setOpen("rejected")}
+            className="secondary-button min-h-7 rounded-md px-2 py-0.5 text-xs text-rose-600 dark:text-rose-400"
+          >
+            <X className="size-3.5" /> Send back
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen("reimbursed")}
+          className="secondary-button min-h-7 rounded-md px-2 py-0.5 text-xs text-emerald-700 dark:text-emerald-400"
+        >
+          <Banknote className="size-3.5" /> Mark paid
+        </button>
+      )}
 
-      <button
-        type="button"
-        onClick={() => setConfirmOpen("approve")}
-        className="secondary-button min-h-7 rounded-md px-2 py-0.5 text-xs text-teal-700 dark:text-teal-400"
+      <ReviewDialog
+        open={open}
+        onClose={() => setOpen(null)}
+        action={action}
+        error={state?.error}
+        count={1}
       >
-        <Check className="size-3.5" /> Approve
-      </button>
-      <button
-        type="button"
-        onClick={() => setConfirmOpen("reject")}
-        className="secondary-button min-h-7 rounded-md px-2 py-0.5 text-xs text-rose-600 dark:text-rose-400"
-      >
-        <X className="size-3.5" /> Reject
-      </button>
-      <button
-        type="button"
-        onClick={() => setConfirmOpen("reimburse")}
-        className="secondary-button min-h-7 rounded-md px-2 py-0.5 text-xs text-emerald-700 dark:text-emerald-400"
-      >
-        <Check className="size-3.5" /> Reimburse
-      </button>
-
-      <ConfirmDialog
-        open={confirmOpen === "approve"}
-        onClose={() => setConfirmOpen(null)}
-        title="Approve this expense?"
-        description="The traveler will be notified that this expense has been approved."
-        confirmLabel="Approve"
-        confirmClassName="primary-button rounded-lg text-sm"
-      >
-        <form action={approveAction}>
-          <input type="hidden" name="id" value={expenseId} />
-          {tripId && <input type="hidden" name="tripId" value={tripId} />}
-          <input type="hidden" name="status" value="approved" />
-          <SubmitButton pendingText="Approving…" className="primary-button rounded-lg text-sm">
-            Approve
-          </SubmitButton>
-        </form>
-      </ConfirmDialog>
-
-      <ConfirmDialog
-        open={confirmOpen === "reject"}
-        onClose={() => setConfirmOpen(null)}
-        title="Reject this expense?"
-        description="The traveler will be notified that this expense has been rejected."
-        confirmLabel="Reject"
-        confirmClassName="secondary-button rounded-lg text-sm text-rose-600 dark:text-rose-400"
-      >
-        <form action={rejectAction}>
-          <input type="hidden" name="id" value={expenseId} />
-          {tripId && <input type="hidden" name="tripId" value={tripId} />}
-          <input type="hidden" name="status" value="rejected" />
-          <SubmitButton pendingText="Rejecting…" className="secondary-button rounded-lg text-sm text-rose-600 dark:text-rose-400">
-            Reject
-          </SubmitButton>
-        </form>
-      </ConfirmDialog>
-
-      <ConfirmDialog
-        open={confirmOpen === "reimburse"}
-        onClose={() => setConfirmOpen(null)}
-        title="Mark as reimbursed?"
-        description="This will mark the expense as reimbursed. This action confirms the traveler has been paid."
-        confirmLabel="Reimburse"
-        confirmClassName="primary-button rounded-lg text-sm"
-      >
-        <form action={reimburseAction}>
-          <input type="hidden" name="id" value={expenseId} />
-          {tripId && <input type="hidden" name="tripId" value={tripId} />}
-          <input type="hidden" name="status" value="reimbursed" />
-          <SubmitButton pendingText="Saving…" className="primary-button rounded-lg text-sm">
-            Reimburse
-          </SubmitButton>
-        </form>
-      </ConfirmDialog>
+        <input type="hidden" name="id" value={expenseId} />
+        {tripId && <input type="hidden" name="tripId" value={tripId} />}
+      </ReviewDialog>
     </div>
+  );
+}
+
+const REVIEW_COPY = {
+  approved: {
+    title: (n: number) => (n === 1 ? "Approve this expense?" : `Approve ${n} expenses?`),
+    body: "The traveler sees the approval right away. Reimbursable items move to “To pay”.",
+    label: "Approve",
+    pending: "Approving…",
+    noteLabel: "Note (optional)",
+  },
+  rejected: {
+    title: (n: number) => (n === 1 ? "Send this expense back?" : `Send ${n} expenses back?`),
+    body: "Tell the traveler what to fix. They can edit and resubmit — nothing is lost.",
+    label: "Send back",
+    pending: "Sending…",
+    noteLabel: "What needs fixing?",
+  },
+  reimbursed: {
+    title: (n: number) => (n === 1 ? "Mark as paid?" : `Mark ${n} expenses as paid?`),
+    body: "Confirms the money has been sent to the traveler. Use the CSV export for your payroll or bank batch.",
+    label: "Mark paid",
+    pending: "Saving…",
+    noteLabel: "",
+  },
+} as const;
+
+/** Confirmation for one or many review decisions. Rejections require a reason. */
+export function ReviewDialog({
+  open,
+  onClose,
+  action,
+  error,
+  count,
+  children,
+}: {
+  open: "approved" | "rejected" | "reimbursed" | null;
+  onClose: () => void;
+  action: (formData: FormData) => void;
+  error?: string;
+  count: number;
+  children: React.ReactNode;
+}) {
+  const copy = open ? REVIEW_COPY[open] : null;
+  return (
+    <Dialog open={open !== null} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-sm">
+        {copy && open && (
+          <>
+            <DialogHeader>
+              <DialogTitle className="text-base font-semibold">{copy.title(count)}</DialogTitle>
+            </DialogHeader>
+            <form action={action} className="grid gap-3">
+              {children}
+              <input type="hidden" name="status" value={open} />
+              <p className="text-sm text-muted-foreground">{copy.body}</p>
+              {copy.noteLabel && (
+                <label className="grid gap-1 text-sm font-medium">
+                  {copy.noteLabel}
+                  <textarea
+                    name="notes"
+                    required={open === "rejected"}
+                    minLength={open === "rejected" ? 3 : undefined}
+                    maxLength={1000}
+                    autoFocus={open === "rejected"}
+                    placeholder={open === "rejected" ? "e.g. Please attach the itemised hotel folio" : ""}
+                    className="form-control min-h-16 font-normal"
+                  />
+                </label>
+              )}
+              {error && <ErrorBanner message={error} />}
+              <div className="flex justify-end gap-2 pt-1">
+                <button type="button" className="secondary-button rounded-lg text-sm" onClick={onClose}>
+                  Cancel
+                </button>
+                <SubmitButton
+                  pendingText={copy.pending}
+                  className={open === "rejected"
+                    ? "secondary-button rounded-lg text-sm text-rose-600 dark:text-rose-400"
+                    : "primary-button rounded-lg text-sm"}
+                >
+                  {copy.label}
+                </SubmitButton>
+              </div>
+            </form>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

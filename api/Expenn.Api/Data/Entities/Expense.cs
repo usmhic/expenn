@@ -20,12 +20,18 @@ public class Expense
     [Column("payment_method")] public string? PaymentMethod { get; set; }
     [Column("reimbursable")] public bool Reimbursable { get; set; } = true;
     [Column("extraction", TypeName = "jsonb")] public string? Extraction { get; set; }
+    [Column("submitted_at")] public DateTimeOffset? SubmittedAt { get; set; }
+    [Column("reviewed_at")] public DateTimeOffset? ReviewedAt { get; set; }
+    [Column("reviewed_by_id")] public string? ReviewedById { get; set; }
+    [Column("review_note")] public string? ReviewNote { get; set; }
+    [Column("reimbursed_at")] public DateTimeOffset? ReimbursedAt { get; set; }
     [Column("created_at")] public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     [Column("updated_at")] public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
     [Column("deleted_at")] public DateTimeOffset? DeletedAt { get; set; }
 
     public Organization Organization { get; set; } = null!;
     public User User { get; set; } = null!;
+    public User? ReviewedBy { get; set; }
     public Trip? Trip { get; set; }
     public ICollection<ExpenseComment> Comments { get; set; } = [];
 }

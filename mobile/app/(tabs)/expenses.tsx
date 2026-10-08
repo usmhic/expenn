@@ -184,6 +184,11 @@ export default function ExpensesTab() {
                         <Text style={[s.rowMeta, { color: colors.textSecondary }]} numberOfLines={1}>
                           {fmtDate(expense.expenseDate)} · {expense.tripName ?? 'No trip'} · {expense.category}
                         </Text>
+                        {expense.status === 'rejected' && expense.reviewNote ? (
+                          <Text style={[s.reviewNote, { color: colors.expired }]} numberOfLines={3}>
+                            {expense.reviewedByName ?? 'Reviewer'}: {expense.reviewNote}
+                          </Text>
+                        ) : null}
                       </View>
                       <View style={s.rowEnd}>
                         <Text style={[s.amount, { color: colors.textPrimary }]}>{expense.currency} {Number(expense.amount).toFixed(2)}</Text>
@@ -269,6 +274,7 @@ const s = StyleSheet.create({
   rowBody: { flex: 1 },
   rowTitle: { fontFamily: 'Inter-SemiBold', fontSize: typography.base },
   rowMeta: { marginTop: 2, fontFamily: 'Inter-Regular', fontSize: typography.sm },
+  reviewNote: { marginTop: 4, fontFamily: 'Inter-Medium', fontSize: typography.sm },
   rowEnd: { alignItems: 'flex-end', gap: 5, paddingTop: 2 },
   amount: { fontFamily: 'Inter-Bold', fontSize: typography.sm },
   badge: { borderRadius: radius.full, paddingHorizontal: 8, paddingVertical: 3 },

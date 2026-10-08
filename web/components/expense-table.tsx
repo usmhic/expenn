@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { ImageOff, MessageSquare, Paperclip } from "lucide-react";
 import { StatusBadge } from "@/components/layout/navigation";
 import { ReviewExpenseButtons } from "@/components/dialogs";
+import { FlagChips } from "@/components/expense-flags";
+import { formatMoney } from "@/lib/expenses";
 import { addExpenseCommentAction } from "@/app/dialog-actions";
 import { cn } from "@/lib/utils";
 
@@ -30,6 +32,9 @@ export type ExpenseRow = {
   notes?: string | null;
   paymentMethod?: string | null;
   tripId?: string | null;
+  flags?: string[];
+  reviewNote?: string | null;
+  reviewedByName?: string | null;
 };
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
@@ -56,7 +61,7 @@ function fmt(date: Date) {
 }
 
 function fmtAmount(amount: string | number, currency: string) {
-  return `${currency} ${Number(amount).toFixed(2)}`;
+  return formatMoney(amount, currency);
 }
 
 function fmtTime(date: Date) {
@@ -199,6 +204,7 @@ function ExpenseRow({
         {/* Merchant */}
         <td className="py-3 pl-4 pr-3">
           <span className="block font-semibold">{expense.merchant}</span>
+          <FlagChips flags={expense.flags} className="mt-1" />
           <span className="block text-xs text-muted-foreground sm:hidden">
             {expense.category}
             {showTraveler && expense.travelerName ? ` · ${expense.travelerName}` : ""}
@@ -251,9 +257,7 @@ function ExpenseRow({
 
         {showReview && (
           <td className="py-3 pl-3 pr-4" onClick={(e) => e.stopPropagation()}>
-            {isSubmitted ? (
-              <ReviewExpenseButtons expenseId={expense.id} tripId={tripId} />
-            ) : null}
+            <ReviewExpenseButtons expenseId={expense.id} tripId={tripId} status={expense.status} />
           </td>
         )}
       </tr>
@@ -262,6 +266,11 @@ function ExpenseRow({
         <tr className="bg-secondary/20">
           <td colSpan={colSpan} className="px-4 py-3">
             <div className="grid gap-3">
+              {expense.reviewNote && (
+                <p className="text-xs text-foreground/80 border-l-2 border-rose-300 pl-3 dark:border-rose-400/40">
+                  <span className="font-semibold">{expense.reviewedByName ?? "Reviewer"}:</span> {expense.reviewNote}
+                </p>
+              )}
               {expense.notes && (
                 <p className="text-xs text-muted-foreground italic border-l-2 border-border pl-3">
                   {expense.notes}

@@ -362,7 +362,7 @@ function FinalCTA({ account }: { account: LandingAccountState | null }) {
             </Button>
             {!dashboardHref && (
               <Button asChild size="sm" variant="outline" className="h-10 px-5 rounded-full glass border-border">
-                <a href="/login">{t.final.cta2}</a>
+                <Link href="/login">{t.final.cta2}</Link>
               </Button>
             )}
           </div>

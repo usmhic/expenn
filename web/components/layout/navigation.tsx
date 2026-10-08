@@ -7,7 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   Bell, BookOpen, BarChart3, Camera, Check, ChevronDown, ChevronRight,
-  Files, Home, LogOut, Plane, Plus, Receipt, Search, Settings,
+  Files, Home, LogOut, Plane, Plus, Receipt, Search, Send, Settings,
   UserRound, UserCog, Wallet, X, PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
@@ -46,8 +46,10 @@ type SearchResult = {
 
 type NotifCounts = {
   pendingApprovals: number;
-  submittedExpenses: number;
-  missingReceipts: number;
+  pendingExpenses: number;
+  awaitingPayment: number;
+  rejectedExpenses: number;
+  draftExpenses: number;
   total: number;
 };
 
@@ -57,6 +59,7 @@ function adminNav(slug: string, role: "admin" | "manager") {
   const root = `/${slug}/admin`;
   return [
     { label: "Trips", href: root, icon: Plane },
+    { label: "Review", href: `${root}/expenses`, icon: Receipt },
     ...(role === "manager" ? [] : [{ label: "Analytics", href: `${root}/analytics`, icon: BarChart3 }]),
     { label: "Settings", href: `${root}/settings`, icon: Settings },
   ] as const;
@@ -233,7 +236,7 @@ export function AppShell({
               {/* Desktop-only action buttons */}
               <div className="hidden lg:flex items-center gap-1">
                 <SearchButton slug={slug} role={role} />
-                <NotifButton />
+                <NotifButton slug={slug} role={role} />
                 {role === "traveler" && (
                   <Link
                     href={`/${slug}/traveler/documents`}
@@ -474,17 +477,18 @@ function SearchButton({ slug, role }: { slug: string; role: "admin" | "manager" 
 }
 
 /* ── Notification button ────────────────────────────────────────────────── */
-function NotifButton() {
+function NotifButton({ slug, role }: { slug: string; role: "admin" | "manager" | "traveler" }) {
   const [counts, setCounts] = useState<NotifCounts | null>(null);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
 
   useEffect(() => {
     fetch("/api/notifications")
       .then((r) => r.json())
       .then(setCounts)
       .catch(() => {});
-  }, []);
+  }, [pathname]);
 
   useEffect(() => {
     if (!open) return;
@@ -503,13 +507,48 @@ function NotifButton() {
   }, [open]);
 
   const total = counts?.total ?? 0;
+  const admin = `/${slug}/admin`;
+  const traveler = `/${slug}/traveler`;
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  const items = counts
+    ? [
+        role !== "traveler" && counts.pendingExpenses > 0 && {
+          key: "review", href: `${admin}/expenses`, icon: Receipt, tone: "blue",
+          title: `${plural(counts.pendingExpenses, "expense")} to review`, sub: "Submitted and waiting for a decision",
+        },
+        role !== "traveler" && counts.awaitingPayment > 0 && {
+          key: "pay", href: `${admin}/expenses?tab=approved`, icon: Wallet, tone: "teal",
+          title: `${plural(counts.awaitingPayment, "expense")} to pay`, sub: "Approved and owed to travelers",
+        },
+        role !== "traveler" && counts.pendingApprovals > 0 && {
+          key: "trips", href: admin, icon: Plane, tone: "amber",
+          title: `${plural(counts.pendingApprovals, "trip request")} pending`, sub: "Travel approvals awaiting a decision",
+        },
+        counts.rejectedExpenses > 0 && {
+          key: "rejected", href: `${traveler}/expenses?status=rejected`, icon: X, tone: "rose",
+          title: `${plural(counts.rejectedExpenses, "expense")} sent back`, sub: "Fix and resubmit to get paid",
+        },
+        counts.draftExpenses > 0 && {
+          key: "drafts", href: `${traveler}/expenses?status=draft`, icon: Send, tone: "neutral",
+          title: `${plural(counts.draftExpenses, "draft")} not submitted`, sub: "Submit when you're ready",
+        },
+      ].filter(Boolean) as { key: string; href: string; icon: typeof Bell; tone: string; title: string; sub: string }[]
+    : [];
+
+  const toneCls: Record<string, string> = {
+    blue: "bg-blue-100 text-blue-700 dark:bg-blue-400/15 dark:text-blue-300",
+    teal: "bg-teal-100 text-teal-700 dark:bg-teal-400/15 dark:text-teal-300",
+    amber: "bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300",
+    rose: "bg-rose-100 text-rose-700 dark:bg-rose-400/15 dark:text-rose-300",
+    neutral: "bg-secondary text-muted-foreground",
+  };
 
   return (
     <div className="relative" ref={ref}>
       <button
         className="icon-button relative"
         title="Notifications"
-        aria-label="Notifications"
+        aria-label={total > 0 ? `Notifications, ${total} need attention` : "Notifications"}
         onClick={() => setOpen((v) => !v)}
       >
         <Bell className="size-4" />
@@ -523,52 +562,30 @@ function NotifButton() {
       {open && (
         <div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-72 rounded-xl border border-border bg-popover shadow-soft overflow-hidden animate-fade-in">
           <div className="border-b border-border px-3 py-2.5">
-            <p className="text-sm font-semibold">Notifications</p>
+            <p className="text-sm font-semibold">Needs your attention</p>
           </div>
 
-          {!counts || total === 0 ? (
+          {items.length === 0 ? (
             <p className="px-3 py-5 text-center text-xs text-muted-foreground">All caught up — nothing pending.</p>
           ) : (
             <div className="py-1">
-              {counts.pendingApprovals > 0 && (
-                <div className="flex items-center gap-2.5 px-3 py-2.5">
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300">
-                    <Plane className="size-3.5" />
+              {items.map(({ key, href, icon: Icon, tone, title, sub }) => (
+                <Link
+                  key={key}
+                  href={href}
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-2.5 px-3 py-2.5 transition-colors hover:bg-secondary/60"
+                >
+                  <span className={cn("flex size-7 shrink-0 items-center justify-center rounded-md", toneCls[tone])}>
+                    <Icon className="size-3.5" />
                   </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">
-                      {counts.pendingApprovals} approval{counts.pendingApprovals !== 1 ? "s" : ""} pending
-                    </p>
-                    <p className="text-xs text-muted-foreground">Trip requests awaiting decision</p>
-                  </div>
-                </div>
-              )}
-              {counts.submittedExpenses > 0 && (
-                <div className="flex items-center gap-2.5 px-3 py-2.5">
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-blue-100 text-blue-700 dark:bg-blue-400/15 dark:text-blue-300">
-                    <Receipt className="size-3.5" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium">{title}</span>
+                    <span className="block text-xs text-muted-foreground">{sub}</span>
                   </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">
-                      {counts.submittedExpenses} expense{counts.submittedExpenses !== 1 ? "s" : ""} to review
-                    </p>
-                    <p className="text-xs text-muted-foreground">Submitted and awaiting approval</p>
-                  </div>
-                </div>
-              )}
-              {counts.missingReceipts > 0 && (
-                <div className="flex items-center gap-2.5 px-3 py-2.5">
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-rose-100 text-rose-700 dark:bg-rose-400/15 dark:text-rose-300">
-                    <X className="size-3.5" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">
-                      {counts.missingReceipts} missing receipt{counts.missingReceipts !== 1 ? "s" : ""}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Expenses without a receipt attached</p>
-                  </div>
-                </div>
-              )}
+                  <ChevronRight className="size-3.5 text-muted-foreground/60" />
+                </Link>
+              ))}
             </div>
           )}
         </div>
@@ -794,7 +811,7 @@ export function StatusBadge({ value }: { value: string }) {
       active: { cls: "bg-teal-100 text-teal-800 dark:bg-teal-400/15 dark:text-teal-200", dot: "bg-teal-500" },
       submitted: { cls: "bg-blue-100 text-blue-800 dark:bg-blue-400/15 dark:text-blue-200", dot: "bg-blue-500" },
       requested: { cls: "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-200", dot: "bg-amber-500" },
-      draft: { cls: "bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300", dot: "bg-amber-400" },
+      draft: { cls: "bg-secondary text-muted-foreground", dot: "bg-muted-foreground/60" },
       rejected: { cls: "bg-rose-100 text-rose-800 dark:bg-rose-400/15 dark:text-rose-200", dot: "bg-rose-500" },
       completed: { cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-200", dot: "bg-emerald-500" },
       reimbursed: { cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-200", dot: "bg-emerald-500" },

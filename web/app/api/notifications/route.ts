@@ -1,26 +1,19 @@
-import { type NextRequest, NextResponse } from "next/server";
-import { apiClient } from "@/lib/api-client";
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { apiClient } from "@/lib/api-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const EMPTY = { pendingApprovals: 0, pendingExpenses: 0, awaitingPayment: 0, rejectedExpenses: 0, draftExpenses: 0, total: 0 };
+
 export async function GET() {
   try {
-    const api = apiClient({ cookie: (await cookies()).toString() });
-
-    const [approvals, summary] = await Promise.all([
-      api.trips.getApprovals({ status: "requested" }).catch(() => []),
-      api.expenses.summary().catch(() => null),
-    ]);
-
-    const pendingApprovals = approvals.length;
-    const submittedExpenses = (summary?.submitted ?? 0);
-    const missingReceipts = 0; // Not tracked by new API, set to 0
-    const total = pendingApprovals + submittedExpenses + missingReceipts;
-
-    return NextResponse.json({ pendingApprovals, submittedExpenses, missingReceipts, total });
+    const counts = await apiClient({ cookie: (await cookies()).toString() }).notifications();
+    // Drafts are a gentle reminder, not an alert, so they don't raise the badge.
+    const total = counts.pendingApprovals + counts.pendingExpenses + counts.awaitingPayment + counts.rejectedExpenses;
+    return NextResponse.json({ ...counts, total });
   } catch {
-    return NextResponse.json({ pendingApprovals: 0, submittedExpenses: 0, missingReceipts: 0, total: 0 });
+    return NextResponse.json(EMPTY);
   }
 }
