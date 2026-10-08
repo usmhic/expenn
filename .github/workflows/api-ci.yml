@@ -126,12 +126,20 @@ jobs:
 
       - name: Start container
         run: |
+          # Production startup validation refuses to boot without these, so the
+          # smoke test supplies placeholder values. Nothing here is contacted:
+          # migrations are skipped and /health touches neither Postgres nor MinIO.
           docker run -d --name expenn-api-test -p 5000:8080 \
-            -e ConnectionStrings__DefaultConnection="" \
+            -e ConnectionStrings__DefaultConnection="Host=localhost;Database=expenn;Username=ci;Password=ci" \
             -e SKIP_MIGRATIONS=true \
             -e Jwt__Secret \
             -e Jwt__Issuer=expenn-api \
             -e Jwt__Audience=expenn-clients \
+            -e Storage__Endpoint=http://localhost:9000 \
+            -e Storage__AccessKey=ci \
+            -e Storage__SecretKey=ci-smoke-test \
+            -e Cors__AllowedOrigins__0=http://localhost:3000 \
+            -e AllowedHosts=localhost \
             expenn-api:pr-test
 
       - name: Wait for server
@@ -141,7 +149,9 @@ jobs:
             echo "[$i/24] waiting…"
             sleep 5
           done
-          echo "Server did not become healthy in time" && exit 1
+          echo "Server did not become healthy in time"
+          docker logs expenn-api-test || true
+          exit 1
 
       - name: Verify health
         run: curl -fsS http://localhost:5000/health
