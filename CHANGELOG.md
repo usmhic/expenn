@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Review & pay** page for admins and managers: tabs for to review, to pay, paid, and
+  sent back; bulk approve, send back, and mark paid; one-click selection of expenses
+  without issues; CSV export for payroll and accounting imports.
+- Expense lifecycle rules in `Domain/Expenses/ExpenseWorkflow.cs`. Travelers can edit and
+  delete drafts, fix rejected expenses, and resubmit; reviewers must give a reason when
+  sending an expense back.
+- Review trail on expenses (`submitted_at`, `reviewed_at`, `reviewed_by_id`,
+  `review_note`, `reimbursed_at`) via the `AddExpenseReviewAudit` migration.
+- Review hints for missing receipts and possible duplicates.
+- Per-currency totals in the expense summary and analytics, plus time-to-decision and
+  time-to-reimburse metrics.
+- `PRODUCT_STRATEGY.md`: market research, product gaps, roadmap, and business model.
+
 - Replaced the Expo mobile icon, adaptive icon, and splash placeholders with the existing Expenn brand logo used by the web app.
 - A documented modular API architecture with schema ownership for identity,
   organizations, travel, expenses, and documents.
@@ -25,6 +38,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- One receipt-first expense form for Add, Edit, and Capture, with standard categories,
+  today's date, the active trip and its currency preselected, and company-card spend
+  marked as not reimbursable.
+- The Capture page no longer pre-fills fake "Demo Merchant" values.
+- Analytics now uses real API data (it previously read fields the API never returned)
+  and never adds different currencies together.
+- The notification bell links to the place where each item is handled and includes
+  travelers' sent-back expenses.
 - Added the Expo WebBrowser dependency and completed the mobile OAuth callback typing and production API fallback used by Traveler authentication.
 - Aligned the mobile app with Expo SDK 54 patch versions and added the required `expo-constants` peer dependency for `expo-router`.
 - Standardized the Android application ID to `com.osascloud.expenn` for Google Play releases.
@@ -38,6 +59,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   supplied entirely through the process environment.
 - Aligned package, web, API, container, documentation, and workflow metadata
   with the usmhic open-source ecosystem.
+
+### Fixed
+
+- The API read the `sub` and `role` claims by their raw names while the JWT handler
+  renamed them, so user-scoped requests (creating a workspace, listing your expenses)
+  resolved an empty user id. Inbound claim mapping is now disabled.
+- Pending expenses without a trip could not be reviewed from the admin dashboard.
+- Trip team cards showed the organisation's member count instead of the team's trips.
 
 ## [0.1.0] - 2026-07-18
 

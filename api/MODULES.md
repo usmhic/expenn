@@ -35,8 +35,10 @@ relationships. `AppDbContext` composes those modules into one unit of work.
 
 ## Fresh baseline and existing data
 
-`Data/Migrations/20260814000000_MultiSchemaBaseline.cs` is the only maintained
-EF Core migration. On a fresh database it creates every schema and table. On a
+`Data/Migrations/20260814000000_MultiSchemaBaseline.cs` is the baseline EF Core
+migration; later migrations (for example `AddExpenseReviewAudit`, which adds the
+expense review trail columns) build on it. On a fresh database the baseline creates
+every schema and table. On a
 legacy database it moves the public tables into a temporary `legacy` schema,
 creates the domain-owned tables, copies rows in dependency order, then removes
 the temporary schema. The work runs inside the migration transaction.
