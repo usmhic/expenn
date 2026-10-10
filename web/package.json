@@ -16,8 +16,8 @@
   "packageManager": "pnpm@11.6.0",
   "scripts": {
     "build": "next build",
-    "dev": "next dev",
-    "start": "next start",
+    "dev": "node ../scripts/with-root-env.mjs --web next dev",
+    "start": "node ../scripts/with-root-env.mjs --web next start",
     "types:check": "fumadocs-mdx && next typegen && tsc --noEmit",
     "postinstall": "fumadocs-mdx",
     "lint": "eslint"

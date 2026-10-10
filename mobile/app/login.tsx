@@ -146,7 +146,7 @@ export default function LoginScreen() {
             {/* Brand */}
             <View style={s.brand}>
               <View style={s.logoRow}>
-                <Image source={require('../assets/icon.png')} style={s.logoImage} />
+                <Image source={require('../assets/mark.png')} style={s.logoImage} resizeMode="contain" />
                 <Text style={[s.appName, { color: colors.textPrimary }]}>expenn</Text>
               </View>
               <Text style={[s.headline, { color: colors.textPrimary }]}>{headline}</Text>

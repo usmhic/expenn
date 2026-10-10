@@ -32,6 +32,9 @@ graveyards, no shoebox of crumpled receipts.
 
 ---
 
+Local setup, shared workspace ports, environment conventions, and `dev` workflows:
+[Local development](./LOCAL_DEVELOPMENT.md).
+
 ## 🎬 Try the demo
 
 | Where | Link | What you'll see |
@@ -100,7 +103,7 @@ never commit it.
 
 | Service | URL |
 |---|---|
-| 🌍 Web | http://localhost:3000 |
+| 🌍 Web | http://localhost:3001 |
 | ⚙️ API | http://localhost:5000 |
 | ❤️ API health | http://localhost:5000/health |
 | 📦 MinIO console | http://localhost:9001 |
