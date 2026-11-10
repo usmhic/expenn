@@ -24,7 +24,12 @@ public record TripDto(
     string Currency,
     string Status,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt
+    DateTimeOffset UpdatedAt,
+    int StopCount = 0,
+    double? RouteDistanceMeters = null,
+    double? RouteDurationSeconds = null,
+    string? RouteSummary = null,
+    List<double[]>? RoutePreview = null
 );
 
 public record TripTravelerDto(

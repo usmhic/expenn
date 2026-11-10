@@ -18,3 +18,12 @@ public record TravelApprovalDecidedEvent(
     string DecidedById,
     DateTimeOffset OccurredAt
 );
+
+public record TripItineraryUpdatedEvent(
+    string TripId,
+    string OrgId,
+    string UserId,
+    int StopCount,
+    double? DistanceMeters,
+    DateTimeOffset OccurredAt
+);

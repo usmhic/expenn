@@ -108,6 +108,19 @@ Oidc__WebCallbackUrl=http://localhost:3000/auth/oidc-callback
 Oidc__MobileCallbackUrl=expenn://auth/oidc-callback
 ```
 
+**Route planning — OpenRouteService (optional):**
+```
+OpenRouteService__ApiKey=            # empty = routing off; the API still starts
+OpenRouteService__BaseUrl=https://api.openrouteservice.org
+OpenRouteService__TimeoutSeconds=10
+```
+
+| Variable | Description |
+|---|---|
+| `OpenRouteService__ApiKey` | OpenRouteService key, sent as the `Authorization` header. Empty disables routing: routing and place endpoints return `503`, `GET /api/routing/status` reports `enabled: false`, and itineraries are saved without a route. |
+| `OpenRouteService__BaseUrl` | Provider base URL (default `https://api.openrouteservice.org`); point it at a self-hosted ORS if you run one. |
+| `OpenRouteService__TimeoutSeconds` | Per-request timeout (default `10`). |
+
 **RabbitMQ / MassTransit:**
 ```
 RabbitMq__Enabled=true               # false = in-memory bus (default)
@@ -166,6 +179,27 @@ All auth flows return:
 | GET | `/api/trips/approvals` | List travel approvals |
 | POST | `/api/trips/{id}/approvals` | Request travel approval |
 | PATCH | `/api/trips/approvals/{id}` | Approve / reject |
+| GET | `/api/trips/{id}/itinerary` | Ordered stops plus the cached route (`routingEnabled`, `routeError`) |
+| PUT | `/api/trips/{id}/itinerary` | Replace stops `{ profile, stops, routeIndex }` (max 25) and recompute the route; a routing failure still saves the stops and sets `routeError` |
+
+Trip list and detail responses also carry `stopCount`, `routeDistanceMeters`,
+`routeDurationSeconds`, `routeSummary` (`"Berlin → Prague → Vienna"`, or
+`"Berlin → +3 → Vienna"` for longer trips) and `routePreview` (at most 48 `[lon, lat]`
+points for thumbnails). Itinerary access: org owners/admins, managers of the trip's
+team, and travelers assigned to the trip.
+
+### Routing & places
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/routing/status` | `{ enabled, profiles }` |
+| GET | `/api/places/search?q=&lat=&lon=&limit=6` | Place autocomplete (`q` ≥ 2 chars, `limit` 1–10, optional focus point) |
+| GET | `/api/places/reverse?lat=&lon=` | Nearest place, `404` when none |
+| POST | `/api/routing/directions` | `{ profile, coordinates: [[lon,lat],…], alternatives }` → route options (2–25 points; alternatives only for 2 points) |
+| POST | `/api/routing/optimize` | `{ profile, coordinates, keepStart, keepEnd }` → `{ order }`, a permutation of the point indices (2–48 points) |
+
+Profiles: `driving-car`, `driving-hgv`, `cycling-regular`, `foot-walking`. Coordinates are
+GeoJSON order `[lon, lat]`. Without a key these endpoints return `503`; provider failures
+return `502 { error }` with a readable message (rejected key, rate limit, no route, timeout).
 
 ### Expenses
 | Method | Path | Description |
@@ -244,6 +278,7 @@ Domain events are published with MassTransit's `IPublishEndpoint`:
 | `ExpenseReviewedEvent` | Expense approved / rejected / reimbursed | Notify submitter, trigger reimbursement |
 | `TravelApprovalRequestedEvent` | Traveler requests approval for a trip | Notify managers |
 | `TravelApprovalDecidedEvent` | Manager approves / rejects approval | Notify traveler |
+| `TripItineraryUpdatedEvent` | A trip's stops are replaced | — (no consumer yet) |
 
 Set `RabbitMq__Enabled=false` (default) to run with an in-memory bus — events are still published and consumed in-process, no broker needed. Flip to `true` to go distributed.
 

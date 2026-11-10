@@ -7,12 +7,14 @@ using Expenn.Api.Infrastructure.Messaging;
 using Expenn.Api.Infrastructure.Security;
 using Expenn.Api.Services.Auth;
 using Expenn.Api.Services.Email;
+using Expenn.Api.Services.Routing;
 using Expenn.Api.Services.Storage;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.Identity.Web;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -35,6 +37,7 @@ builder.Services.Configure<StorageSettings>(builder.Configuration.GetSection("St
 builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection("Cors"));
 builder.Services.Configure<RabbitMqSettings>(builder.Configuration.GetSection("RabbitMq"));
 builder.Services.Configure<SecuritySettings>(builder.Configuration.GetSection("Security"));
+builder.Services.Configure<OpenRouteServiceSettings>(builder.Configuration.GetSection("OpenRouteService"));
 
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()!;
 var adSettings = builder.Configuration.GetSection("ActiveDirectory").Get<ActiveDirectorySettings>() ?? new();
@@ -132,6 +135,12 @@ builder.Services.AddScoped<IOtpService, OtpService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IStorageService, StorageService>();
 builder.Services.AddScoped<IActiveDirectoryService, ActiveDirectoryService>();
+
+// Route planning and place search (optional). Without OpenRouteService__ApiKey the API
+// still starts; routing endpoints answer 503 and the itinerary is saved without a route.
+builder.Services.AddHttpClient(OpenRouteServiceClient.HttpClientName, (sp, http) =>
+    OpenRouteServiceClient.Configure(http, sp.GetRequiredService<IOptions<OpenRouteServiceSettings>>().Value));
+builder.Services.AddScoped<IRoutingService, OpenRouteServiceClient>();
 
 // ── Messaging (MassTransit + RabbitMQ / in-memory) ───────────────────────────
 
