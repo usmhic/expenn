@@ -701,6 +701,41 @@ namespace Expenn.Api.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("organization_id");
 
+                    b.Property<string>("RouteBbox")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("route_bbox");
+
+                    b.Property<double?>("RouteDistanceMeters")
+                        .HasColumnType("double precision")
+                        .HasColumnName("route_distance_m");
+
+                    b.Property<double?>("RouteDurationSeconds")
+                        .HasColumnType("double precision")
+                        .HasColumnName("route_duration_s");
+
+                    b.Property<string>("RouteGeometry")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("route_geometry");
+
+                    b.Property<string>("RouteLegs")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("route_legs");
+
+                    b.Property<string>("RoutePreview")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("route_preview");
+
+                    b.Property<string>("RouteProfile")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("driving-car")
+                        .HasColumnName("route_profile");
+
+                    b.Property<DateTimeOffset?>("RouteUpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("route_updated_at");
+
                     b.Property<DateTimeOffset>("StartDate")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("start_date");
@@ -727,6 +762,81 @@ namespace Expenn.Api.Data.Migrations
                         .HasDatabaseName("trips_team_status_idx");
 
                     b.ToTable("trips", "travel");
+                });
+
+            modelBuilder.Entity("Expenn.Api.Data.Entities.TripStop", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("address");
+
+                    b.Property<DateOnly?>("ArriveOn")
+                        .HasColumnType("date")
+                        .HasColumnName("arrive_on");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateOnly?>("DepartOn")
+                        .HasColumnType("date")
+                        .HasColumnName("depart_on");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("stop")
+                        .HasColumnName("kind");
+
+                    b.Property<double>("Latitude")
+                        .HasColumnType("double precision")
+                        .HasColumnName("latitude");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("double precision")
+                        .HasColumnName("longitude");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("notes");
+
+                    b.Property<string>("OrganizationId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("organization_id");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer")
+                        .HasColumnName("position");
+
+                    b.Property<string>("TripId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("trip_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TripId", "Position")
+                        .HasDatabaseName("trip_stops_trip_position_idx");
+
+                    b.ToTable("trip_stops", "travel");
                 });
 
             modelBuilder.Entity("Expenn.Api.Data.Entities.TripTraveler", b =>
@@ -1053,6 +1163,17 @@ namespace Expenn.Api.Data.Migrations
                     b.Navigation("Team");
                 });
 
+            modelBuilder.Entity("Expenn.Api.Data.Entities.TripStop", b =>
+                {
+                    b.HasOne("Expenn.Api.Data.Entities.Trip", "Trip")
+                        .WithMany("Stops")
+                        .HasForeignKey("TripId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Trip");
+                });
+
             modelBuilder.Entity("Expenn.Api.Data.Entities.TripTraveler", b =>
                 {
                     b.HasOne("Expenn.Api.Data.Entities.Trip", "Trip")
@@ -1096,6 +1217,8 @@ namespace Expenn.Api.Data.Migrations
                     b.Navigation("Approvals");
 
                     b.Navigation("Expenses");
+
+                    b.Navigation("Stops");
 
                     b.Navigation("Travelers");
                 });

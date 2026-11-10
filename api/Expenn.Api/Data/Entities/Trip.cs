@@ -19,9 +19,20 @@ public class Trip
     [Column("updated_at")] public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
     [Column("deleted_at")] public DateTimeOffset? DeletedAt { get; set; }
 
+    // Itinerary route, computed from the ordered stops by the routing provider.
+    [Column("route_profile")] public string RouteProfile { get; set; } = "driving-car";
+    [Column("route_distance_m")] public double? RouteDistanceMeters { get; set; }
+    [Column("route_duration_s")] public double? RouteDurationSeconds { get; set; }
+    [Column("route_geometry", TypeName = "jsonb")] public string? RouteGeometry { get; set; }
+    [Column("route_legs", TypeName = "jsonb")] public string? RouteLegs { get; set; }
+    [Column("route_bbox", TypeName = "jsonb")] public string? RouteBbox { get; set; }
+    [Column("route_preview", TypeName = "jsonb")] public string? RoutePreview { get; set; }
+    [Column("route_updated_at")] public DateTimeOffset? RouteUpdatedAt { get; set; }
+
     public Organization Organization { get; set; } = null!;
     public Team? Team { get; set; }
     public ICollection<TripTraveler> Travelers { get; set; } = [];
     public ICollection<TravelApproval> Approvals { get; set; } = [];
     public ICollection<Expense> Expenses { get; set; } = [];
+    public ICollection<TripStop> Stops { get; set; } = [];
 }
