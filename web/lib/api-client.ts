@@ -19,6 +19,9 @@ const API_BASE =
     ? (process.env.DOTNET_API_URL ?? process.env.NEXT_PUBLIC_DOTNET_API_URL ?? 'http://localhost:5000')
     : (process.env.NEXT_PUBLIC_DOTNET_API_URL ?? 'http://localhost:5000');
 
+/** Base URL of the .NET API for the current runtime (server or browser). */
+export const API_BASE_URL = API_BASE;
+
 export class ApiError extends Error {
   constructor(public readonly status: number, message: string) {
     super(message);
@@ -158,6 +161,8 @@ function createClient(opts: FetchOptions = {}) {
       getById: (id: string) => get<TripDto>(`/api/trips/${id}`),
       create: (body: CreateTripRequest) => post<TripDto>('/api/trips', body),
       updateStatus: (id: string, status: string) => patch<TripDto>(`/api/trips/${id}/status`, { status }),
+      getItinerary: (id: string) => get<ItineraryDto>(`/api/trips/${id}/itinerary`),
+      saveItinerary: (id: string, body: SaveItineraryRequest) => put<ItineraryDto>(`/api/trips/${id}/itinerary`, body),
 
       getTravelers: (tripId: string) => get<TripTravelerDto[]>(`/api/trips/${tripId}/travelers`),
       assignTravelers: (tripId: string, travelerUserIds: string[]) =>
@@ -217,6 +222,20 @@ function createClient(opts: FetchOptions = {}) {
     analytics: {
       overview: (params?: { year?: number; month?: number }) => get<AnalyticsOverviewDto>('/api/analytics/overview', params),
       spendByGroup: (params?: { year?: number }) => get('/api/analytics/spend-by-group', params),
+    },
+
+    places: {
+      search: (q: string, near?: { lat: number; lon: number }, limit = 6) =>
+        get<PlaceDto[]>('/api/places/search', { q, lat: near?.lat, lon: near?.lon, limit }),
+      reverse: (lat: number, lon: number) => get<PlaceDto>('/api/places/reverse', { lat, lon }),
+    },
+
+    routing: {
+      status: () => get<RoutingStatusDto>('/api/routing/status'),
+      directions: (body: { profile: RouteProfile; coordinates: [number, number][]; alternatives?: boolean }) =>
+        post<RouteOptionsDto>('/api/routing/directions', body),
+      optimize: (body: { profile: RouteProfile; coordinates: [number, number][]; keepStart?: boolean; keepEnd?: boolean }) =>
+        post<{ order: number[] }>('/api/routing/optimize', body),
     },
 
     search: (q: string) => get('/api/search', { q }),
@@ -314,6 +333,83 @@ export interface TripDto {
   status: string;
   createdAt: string;
   updatedAt: string;
+  stopCount?: number;
+  routeDistanceMeters?: number | null;
+  routeDurationSeconds?: number | null;
+  /** "Berlin → Prague → Vienna" */
+  routeSummary?: string | null;
+  /** Downsampled route as [lon, lat] pairs, for thumbnails. */
+  routePreview?: [number, number][] | null;
+}
+
+export type RouteProfile = 'driving-car' | 'driving-hgv' | 'cycling-regular' | 'foot-walking';
+export type StopKind = 'stop' | 'stay' | 'meeting' | 'transit';
+
+export interface PlaceDto {
+  id: string;
+  name: string;
+  label: string;
+  locality?: string;
+  region?: string;
+  country?: string;
+  countryCode?: string;
+  latitude: number;
+  longitude: number;
+  kind?: string;
+}
+
+export interface RouteLegDto {
+  distanceMeters: number;
+  durationSeconds: number;
+}
+
+export interface RouteDto {
+  distanceMeters: number;
+  durationSeconds: number;
+  /** GeoJSON LineString, coordinates are [lon, lat]. */
+  geometry: { type: 'LineString'; coordinates: [number, number][] };
+  legs: RouteLegDto[];
+  bbox?: [number, number, number, number];
+}
+
+export interface RouteOptionsDto {
+  profile: RouteProfile;
+  routes: RouteDto[];
+}
+
+export interface RoutingStatusDto {
+  enabled: boolean;
+  profiles: RouteProfile[];
+}
+
+export interface TripStopDto {
+  id: string;
+  position: number;
+  name: string;
+  address?: string;
+  latitude: number;
+  longitude: number;
+  /** yyyy-MM-dd */
+  arriveOn?: string;
+  departOn?: string;
+  notes?: string;
+  kind: StopKind;
+}
+
+export interface ItineraryDto {
+  tripId: string;
+  profile: RouteProfile;
+  stops: TripStopDto[];
+  route?: RouteDto | null;
+  routeUpdatedAt?: string;
+  routingEnabled: boolean;
+  routeError?: string;
+}
+
+export interface SaveItineraryRequest {
+  profile: RouteProfile;
+  stops: Array<Omit<TripStopDto, 'id' | 'position' | 'kind'> & { id?: string; kind?: StopKind }>;
+  routeIndex?: number;
 }
 
 export interface TripTravelerDto {

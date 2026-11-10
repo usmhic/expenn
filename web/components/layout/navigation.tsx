@@ -1,21 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { Fragment, startTransition, useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
-  Bell, BookOpen, BarChart3, Camera, Check, ChevronDown, ChevronRight,
-  Files, Home, LogOut, Plane, Plus, Receipt, Search, Send, Settings,
-  UserRound, UserCog, Wallet, X, PanelLeftClose, PanelLeftOpen,
+  ArrowLeftRight, BarChart3, Bell, BookOpen, Camera, Check, ChevronDown, ChevronRight,
+  ChevronsUpDown, Files, Home, LayoutDashboard, LogOut, Map as MapIcon, PanelLeftClose,
+  PanelLeftOpen, Plane, Plus, Receipt, Search, Send, Settings, UserCog, Users, Wallet, X,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import type { MeResponse } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { Spinner } from "@/components/ui/spinner";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
-import { Wordmark } from "@/components/layout/wordmark";
+import { BrandMark, Wordmark } from "@/components/layout/wordmark";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { switchOrgAction } from "@/app/actions";
 import {
   DropdownMenu,
@@ -35,7 +35,10 @@ export type BreadcrumbItem = {
   addLabel?: string;
 };
 
+type Role = "admin" | "manager" | "traveler";
 type OrgEntry = { id: string; name: string; slug: string; role: string };
+type NavItem = { label: string; href: string; icon: typeof Home; badgeKey?: keyof NotifCounts; exact?: boolean };
+type NavSection = { label: string; items: NavItem[] };
 
 type SearchResult = {
   type: "trip" | "expense";
@@ -53,26 +56,64 @@ type NotifCounts = {
   total: number;
 };
 
-const SIDEBAR_KEY = "expenn-sidebar-open";
+const SIDEBAR_KEY = "expenn-sidebar-collapsed";
 
-function adminNav(slug: string, role: "admin" | "manager") {
+function navFor(slug: string, role: Role, personal?: boolean): NavSection[] {
+  if (role === "traveler") {
+    const root = `/${slug}/traveler`;
+    return [
+      {
+        label: "Travel",
+        items: [
+          { label: "Home", href: root, icon: Home, exact: true },
+          { label: "Trips", href: `${root}/trips`, icon: MapIcon },
+          { label: "Expenses", href: `${root}/expenses`, icon: Wallet, badgeKey: "rejectedExpenses" },
+          { label: "Documents", href: `${root}/documents`, icon: Files },
+        ],
+      },
+      ...(personal
+        ? [{ label: "Account", items: [{ label: "Account", href: `${root}/account`, icon: UserCog }] }]
+        : []),
+    ];
+  }
   const root = `/${slug}/admin`;
   return [
-    { label: "Trips", href: root, icon: Plane },
-    { label: "Review", href: `${root}/expenses`, icon: Receipt },
-    ...(role === "manager" ? [] : [{ label: "Analytics", href: `${root}/analytics`, icon: BarChart3 }]),
-    { label: "Settings", href: `${root}/settings`, icon: Settings },
-  ] as const;
+    {
+      label: "Workspace",
+      items: [
+        { label: "Overview", href: root, icon: LayoutDashboard, exact: true },
+        { label: "Trips", href: `${root}/trips`, icon: MapIcon, badgeKey: "pendingApprovals" },
+        { label: "Review & pay", href: `${root}/expenses`, icon: Receipt, badgeKey: "pendingExpenses" },
+        ...(role === "manager" ? [] : [{ label: "Analytics", href: `${root}/analytics`, icon: BarChart3 }]),
+      ],
+    },
+    {
+      label: "Organisation",
+      items: [{ label: "People & settings", href: `${root}/settings`, icon: Settings }],
+    },
+  ];
 }
 
-function travelerNav(slug: string, personal?: boolean) {
-  const root = `/${slug}/traveler`;
+function mobileNavFor(slug: string, role: Role): NavItem[] {
+  if (role === "traveler") {
+    const root = `/${slug}/traveler`;
+    return [
+      { label: "Home", href: root, icon: Home, exact: true },
+      { label: "Trips", href: `${root}/trips`, icon: MapIcon },
+      { label: "Capture", href: `${root}/capture`, icon: Camera },
+      { label: "Expenses", href: `${root}/expenses`, icon: Wallet },
+      { label: "Docs", href: `${root}/documents`, icon: Files },
+    ];
+  }
+  const root = `/${slug}/admin`;
   return [
-    { label: "Home", href: root, icon: Home },
-    { label: "Expenses", href: `${root}/expenses`, icon: Wallet },
-    { label: "Capture", href: `${root}/capture`, icon: Camera },
-    ...(personal ? [{ label: "Account", href: `${root}/account`, icon: UserCog }] : []),
-  ] as const;
+    { label: "Overview", href: root, icon: LayoutDashboard, exact: true },
+    { label: "Trips", href: `${root}/trips`, icon: MapIcon },
+    { label: "Review", href: `${root}/expenses`, icon: Receipt, badgeKey: "pendingExpenses" },
+    role === "manager"
+      ? { label: "Settings", href: `${root}/settings`, icon: Settings }
+      : { label: "Analytics", href: `${root}/analytics`, icon: BarChart3 },
+  ];
 }
 
 export function AppShell({
@@ -80,36 +121,43 @@ export function AppShell({
   children,
   breadcrumbs,
   personal,
+  wide,
 }: {
-  role: "admin" | "manager" | "traveler";
+  role: Role;
   children: React.ReactNode;
   breadcrumbs?: BreadcrumbItem[];
   personal?: boolean;
+  /** Let the page use the full content width (maps, planners). */
+  wide?: boolean;
 }) {
   const pathname = usePathname();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
   const [me, setMe] = useState<MeResponse | null>(null);
+  const [counts, setCounts] = useState<NotifCounts | null>(null);
   const slug = getWorkspaceSlug(pathname);
-  const nav = role === "traveler" ? travelerNav(slug, personal) : adminNav(slug, role);
-  const userName = me?.name ?? "Account";
-  const userEmail = me?.email ?? "";
+  const sections = navFor(slug, role, personal);
+  const mobileNav = mobileNavFor(slug, role);
 
   useEffect(() => {
     fetch("/api/me").then((r) => (r.ok ? r.json() : null)).then(setMe).catch(() => setMe(null));
   }, []);
 
   useEffect(() => {
+    fetch("/api/notifications").then((r) => r.json()).then(setCounts).catch(() => {});
+  }, [pathname]);
+
+  useEffect(() => {
     try {
       const stored = localStorage.getItem(SIDEBAR_KEY);
-      if (stored !== null) startTransition(() => setSidebarOpen(stored !== "false"));
+      if (stored === "true") startTransition(() => setCollapsed(true));
     } catch {}
   }, []);
 
   function toggleSidebar() {
-    const next = !sidebarOpen;
-    setSidebarOpen(next);
+    const next = !collapsed;
+    setCollapsed(next);
     try { localStorage.setItem(SIDEBAR_KEY, String(next)); } catch {}
   }
 
@@ -127,171 +175,139 @@ export function AppShell({
     }
   }
 
-  return (
-    <div className="dashboard-shell">
-      <div className="dashboard-frame">
-        {/* ── Desktop sidebar ─────────────────────────────────────────────── */}
-        <aside className={cn("dashboard-sidebar hidden lg:flex lg:flex-col", !sidebarOpen && "dashboard-sidebar-collapsed")}>
+  const canSwitchView = me?.organizationRole ? ["owner", "admin", "manager"].includes(me.organizationRole) : role !== "traveler";
 
-          {/* Brand + toggle */}
-          {sidebarOpen ? (
-            <div className="dashboard-sidebar-brand">
-              <Wordmark className="flex-1 min-w-0" />
-              <button
-                onClick={toggleSidebar}
-                className="icon-button ml-auto shrink-0"
-                aria-label="Collapse sidebar"
-              >
-                <PanelLeftClose className="size-4" />
-              </button>
+  return (
+    <div className="app-shell">
+      {/* ── Desktop sidebar ─────────────────────────────────────────────── */}
+      <aside className="app-sidebar" data-collapsed={collapsed}>
+        <div className={cn("flex h-10 items-center gap-2 px-1", collapsed && "justify-center px-0")}>
+          <Wordmark compact={collapsed} href={sections[0].items[0].href} iconClassName="size-8" />
+          {!collapsed && (
+            <button onClick={toggleSidebar} className="icon-button icon-button-sm ml-auto" aria-label="Collapse sidebar">
+              <PanelLeftClose className="size-4" />
+            </button>
+          )}
+        </div>
+
+        <WorkspaceSwitcher slug={slug} collapsed={collapsed} />
+
+        {role === "traveler" && (
+          <Link
+            href={`/${slug}/traveler/capture`}
+            className={cn("primary-button mt-2 w-full", collapsed && "px-0")}
+            aria-label="Capture a receipt"
+            title={collapsed ? "Capture a receipt" : undefined}
+          >
+            <Camera className="size-4" />
+            {!collapsed && "Capture receipt"}
+          </Link>
+        )}
+
+        <nav className="mt-1 flex-1 overflow-y-auto scrollbar-none" aria-label={role === "traveler" ? "Traveler navigation" : "Admin navigation"}>
+          {sections.map((section) => (
+            <div key={section.label}>
+              {collapsed ? <div className="my-2 h-px bg-border" /> : <p className="nav-section-label">{section.label}</p>}
+              <div className="space-y-0.5">
+                {section.items.map((item) => {
+                  const active = isActive(pathname, item);
+                  const badge = item.badgeKey && counts ? counts[item.badgeKey] : 0;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn("nav-link", active && "nav-link-active", collapsed && "justify-center px-0")}
+                      aria-current={active ? "page" : undefined}
+                      aria-label={collapsed ? item.label : undefined}
+                      title={collapsed ? item.label : undefined}
+                    >
+                      <item.icon className="size-[1.125rem] shrink-0" />
+                      {!collapsed && <span className="truncate">{item.label}</span>}
+                      {!collapsed && badge > 0 && <span className="nav-badge">{badge > 99 ? "99+" : badge}</span>}
+                      {collapsed && badge > 0 && <span className="absolute right-2 top-2 size-2 rounded-full bg-primary" />}
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
-          ) : (
-            <div className="dashboard-sidebar-brand flex-col items-center justify-center gap-2">
-              <Link href="/" className="flex items-center justify-center" aria-label="Home">
-                <span className="brand-icon-mark size-8 rounded-lg">
-                  <Image src="/icon.png" alt="" width={32} height={32} className="size-full object-contain" />
-                </span>
-              </Link>
-              <button
-                onClick={toggleSidebar}
-                className="icon-button"
-                aria-label="Expand sidebar"
-              >
+          ))}
+        </nav>
+
+        <div className="space-y-1 border-t border-border pt-3">
+          {canSwitchView && (
+            <Link
+              href={role === "traveler" ? `/${slug}/admin` : `/${slug}/traveler`}
+              className={cn("nav-link", collapsed && "justify-center px-0")}
+              title={collapsed ? "Switch view" : undefined}
+            >
+              <ArrowLeftRight className="size-[1.125rem] shrink-0" />
+              {!collapsed && <span className="truncate">{role === "traveler" ? "Admin view" : "My travel view"}</span>}
+            </Link>
+          )}
+          <div className={cn("flex items-center gap-1", collapsed ? "flex-col" : "justify-between px-1")}>
+            <Link href="/docs" className="icon-button icon-button-sm" title="Help center" aria-label="Help center">
+              <BookOpen className="size-4" />
+            </Link>
+            <ThemeToggle className="icon-button-sm" />
+            {collapsed ? (
+              <button onClick={toggleSidebar} className="icon-button icon-button-sm" aria-label="Expand sidebar">
                 <PanelLeftOpen className="size-4" />
               </button>
-            </div>
-          )}
-
-          {/* Nav items */}
-          <nav
-            className="dashboard-sidebar-nav flex-1 space-y-0.5"
-            aria-label={role === "traveler" ? "Traveler navigation" : "Admin navigation"}
-          >
-            {nav.map(({ label, href, icon: Icon }) => (
-              <Link
-                key={href}
-                href={href}
-                className={cn("nav-link", isActive(pathname, href) && "nav-link-active", !sidebarOpen && "justify-center gap-0 px-0")}
-                aria-label={!sidebarOpen ? label : undefined}
-                aria-current={isActive(pathname, href) ? "page" : undefined}
-                title={!sidebarOpen ? label : undefined}
-              >
-                <Icon className="size-4 shrink-0" />
-                {sidebarOpen && <span className="truncate">{label}</span>}
-              </Link>
-            ))}
-          </nav>
-
-          {/* Bottom: docs + theme (same row) + account */}
-          <div className="mt-4 space-y-1">
-            <div className={cn("flex items-center", sidebarOpen ? "justify-between" : "flex-col gap-2 items-center")}>
-              <Link
-                href="/docs"
-                className="icon-button"
-                title="Documentation"
-                aria-label="Documentation"
-              >
-                <BookOpen className="size-4" />
-              </Link>
-              <ThemeToggle />
-            </div>
-
-            <AccountMenu
-              userName={userName}
-              userEmail={userEmail}
-              role={role}
-              slug={slug}
-              collapsed={!sidebarOpen}
-              onSignOut={handleSignOut}
-              signingOut={signingOut}
-            />
+            ) : null}
           </div>
-        </aside>
+          <AccountMenu
+            me={me}
+            role={role}
+            slug={slug}
+            collapsed={collapsed}
+            onSignOut={handleSignOut}
+            signingOut={signingOut}
+          />
+        </div>
+      </aside>
 
-        {/* ── Main ────────────────────────────────────────────────────────── */}
-        <main className="dashboard-main">
-          <header className="top-bar">
-            {/* Left: wordmark (mobile/tablet) + org switcher + breadcrumbs */}
-            <div className="flex min-w-0 items-center gap-1 overflow-hidden">
-              <Wordmark className="hidden sm:inline-flex lg:hidden shrink-0 mr-1" />
-              <OrgSwitcher slug={slug} />
-              {breadcrumbs?.map((item, i) => (
-                <Fragment key={i}>
-                  <ChevronRight className="size-3 shrink-0 text-muted-foreground/35" />
-                  {item.items && item.items.length > 0 ? (
-                    <BreadcrumbDropdown item={item} currentPathname={pathname} />
-                  ) : item.href ? (
-                    <Link href={item.href} className="truncate text-sm text-muted-foreground hover:text-foreground transition-colors">
-                      {item.label}
-                    </Link>
-                  ) : (
-                    <span className="truncate text-sm font-semibold text-foreground">{item.label}</span>
-                  )}
-                </Fragment>
-              ))}
+      {/* ── Main column ─────────────────────────────────────────────────── */}
+      <div className="app-main" data-collapsed={collapsed}>
+        <header className="app-topbar">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <Link href={sections[0].items[0].href} className="lg:hidden" aria-label="Home">
+              <BrandMark className="size-8" />
+            </Link>
+            <div className="lg:hidden min-w-0">
+              <WorkspaceSwitcher slug={slug} compactTrigger />
             </div>
-
-            {/* Right action buttons */}
-            <div className="flex shrink-0 items-center gap-1">
-              {/* Desktop-only action buttons */}
-              <div className="hidden lg:flex items-center gap-1">
-                <SearchButton slug={slug} role={role} />
-                <NotifButton slug={slug} role={role} />
-                {role === "traveler" && (
-                  <Link
-                    href={`/${slug}/traveler/documents`}
-                    className="icon-button"
-                    title="My documents"
-                    aria-label="My documents"
-                  >
-                    <Files className="size-4" />
-                  </Link>
-                )}
-              </div>
-
-              {/* Mobile-only fallbacks */}
-              <Link href="/docs" className="icon-button lg:hidden" aria-label="Documentation" title="Docs">
-                <BookOpen className="size-4" />
-              </Link>
-              <span className="lg:hidden"><ThemeToggle /></span>
-              <span className="lg:hidden">
-                <AccountMenu
-                  userName={userName}
-                  userEmail={userEmail}
-                  role={role}
-                  slug={slug}
-                  collapsed={true}
-                  onSignOut={handleSignOut}
-                  signingOut={signingOut}
-                />
-              </span>
-            </div>
-          </header>
-          {children}
-        </main>
+            <Breadcrumbs items={breadcrumbs} pathname={pathname} />
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <CommandSearch slug={slug} role={role} />
+            <NotificationsMenu slug={slug} role={role} counts={counts} />
+            <span className="lg:hidden">
+              <AccountMenu me={me} role={role} slug={slug} collapsed iconOnly onSignOut={handleSignOut} signingOut={signingOut} />
+            </span>
+          </div>
+        </header>
+        <main className={cn("app-content", wide && "app-content-wide")}>{children}</main>
       </div>
 
-      {/* ── Mobile bottom nav ───────────────────────────────────────────── */}
-      <nav className="mobile-nav lg:hidden">
-        <ul className={cn("grid text-center", nav.length === 4 ? "grid-cols-4" : "grid-cols-3")}>
-          {nav.map(({ label, href, icon: Icon }) => {
-            const isCapture = href.endsWith("/capture");
-            const active = isActive(pathname, href);
+      {/* ── Mobile tab bar ──────────────────────────────────────────────── */}
+      <nav className="mobile-tabbar" aria-label="Primary">
+        <ul className="flex items-stretch">
+          {mobileNav.map((item) => {
+            const active = isActive(pathname, item);
+            const isCapture = item.href.endsWith("/capture");
+            const badge = item.badgeKey && counts ? counts[item.badgeKey] : 0;
             return (
-              <li key={href}>
-                <Link
-                  href={href}
-                  className={cn("mobile-nav-link", active && "mobile-nav-link-active", isCapture && !active && "text-primary")}
-                  aria-current={active ? "page" : undefined}
-                >
-                  <span className={cn(
-                    "mobile-nav-icon",
-                    isCapture && "bg-gradient-primary text-primary-foreground shadow-elegant",
-                    active && !isCapture && "bg-primary/12 text-primary",
-                  )}>
-                    <Icon className="size-4" />
-                  </span>
-                  <span className="mobile-nav-label">{label}</span>
+              <li key={item.href} className="flex flex-1 justify-center">
+                <Link href={item.href} className="mobile-tab relative" aria-current={active ? "page" : undefined}>
+                  {isCapture ? (
+                    <span className="mobile-tab-fab" aria-hidden>
+                      <item.icon className="size-6" />
+                    </span>
+                  ) : (
+                    <item.icon className="size-5" />
+                  )}
+                  <span className={cn(isCapture && "-mt-0.5")}>{item.label}</span>
+                  {badge > 0 && <span className="absolute right-[28%] top-1.5 size-2 rounded-full bg-primary" />}
                 </Link>
               </li>
             );
@@ -302,342 +318,333 @@ export function AppShell({
   );
 }
 
-/* ── Search button ──────────────────────────────────────────────────────── */
-function SearchButton({ slug, role }: { slug: string; role: "admin" | "manager" | "traveler" }) {
+/* ── Breadcrumbs ────────────────────────────────────────────────────────── */
+function Breadcrumbs({ items, pathname }: { items?: BreadcrumbItem[]; pathname: string }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <nav aria-label="Breadcrumb" className="hidden min-w-0 items-center gap-1 overflow-hidden lg:flex">
+      {items.map((item, i) => {
+        const last = i === items.length - 1;
+        return (
+          <Fragment key={i}>
+            {i > 0 && <ChevronRight className="size-3.5 shrink-0 text-subtle" />}
+            {item.items && item.items.length > 0 ? (
+              <BreadcrumbDropdown item={item} currentPathname={pathname} />
+            ) : item.href && !last ? (
+              <Link href={item.href} className="truncate rounded-md px-1.5 py-1 text-sm text-muted-foreground transition-colors hover:text-foreground">
+                {item.label}
+              </Link>
+            ) : (
+              <span className="truncate px-1.5 text-sm font-semibold text-foreground">{item.label}</span>
+            )}
+          </Fragment>
+        );
+      })}
+    </nav>
+  );
+}
+
+function BreadcrumbDropdown({ item, currentPathname }: { item: BreadcrumbItem; currentPathname: string }) {
+  const peers = item.items ?? [];
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="flex max-w-[14rem] items-center gap-1 overflow-hidden rounded-md px-1.5 py-1 text-sm font-semibold text-foreground transition-colors hover:bg-muted">
+          <span className="truncate">{item.label}</span>
+          <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-64">
+        {peers.map((sub) => {
+          const active = currentPathname.startsWith(sub.href);
+          return (
+            <DropdownMenuItem key={sub.href} asChild>
+              <Link href={sub.href} className={cn("flex items-center justify-between gap-2", active && "text-primary")}>
+                <span className="truncate">{sub.label}</span>
+                {active && <Check className="size-3.5 shrink-0" />}
+              </Link>
+            </DropdownMenuItem>
+          );
+        })}
+        {item.addHref && (
+          <>
+            {peers.length > 0 && <DropdownMenuSeparator />}
+            <DropdownMenuItem asChild>
+              <Link href={item.addHref} className="flex items-center gap-2 font-semibold text-primary">
+                <Plus className="size-4" /> {item.addLabel ?? "New"}
+              </Link>
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/* ── Command search (⌘K) ────────────────────────────────────────────────── */
+function CommandSearch({ slug, role }: { slug: string; role: Role }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(-1);
-  const ref = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const root = role === "traveler" ? `/${slug}/traveler` : `/${slug}/admin`;
+
+  const quickLinks: SearchResult[] = role === "traveler"
+    ? [
+        { type: "trip", id: "__trips", label: "Plan a trip", sub: "Open your trips and the route planner" },
+        { type: "expense", id: "__capture", label: "Capture a receipt", sub: "Add an expense with a photo" },
+      ]
+    : [
+        { type: "expense", id: "__review", label: "Review & pay", sub: "Expenses waiting for a decision" },
+        { type: "trip", id: "__trips", label: "All trips", sub: "Budgets, approvals and itineraries" },
+      ];
 
   const fetchResults = useCallback((q: string) => {
-    if (!q.trim()) { setResults([]); setLoading(false); return; }
+    if (q.trim().length < 2) { setResults([]); setLoading(false); return; }
     setLoading(true);
     fetch(`/api/search?q=${encodeURIComponent(q)}`)
       .then((r) => r.json())
-      .then((data) => { setResults(data.results ?? []); setActiveIndex(-1); })
+      .then((data) => { setResults(data.results ?? []); setActiveIndex(0); })
       .catch(() => setResults([]))
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => fetchResults(query), 250);
+    debounceRef.current = setTimeout(() => fetchResults(query), 200);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [query, fetchResults]);
 
   useEffect(() => {
-    if (!open) { startTransition(() => { setQuery(""); setResults([]); setActiveIndex(-1); }); return; }
-    setTimeout(() => inputRef.current?.focus(), 0);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") { setOpen(false); return; }
-      if (e.key === "ArrowDown") { e.preventDefault(); setActiveIndex((i) => Math.min(i + 1, results.length - 1)); return; }
-      if (e.key === "ArrowUp") { e.preventDefault(); setActiveIndex((i) => Math.max(i - 1, -1)); return; }
-      if (e.key === "Enter" && activeIndex >= 0) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        navigateTo(results[activeIndex]);
+        setOpen((v) => !v);
       }
     }
-    function onMouse(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
     document.addEventListener("keydown", onKey);
-    document.addEventListener("mousedown", onMouse);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.removeEventListener("mousedown", onMouse);
-    };
-  }, [open, activeIndex, results]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
-  function navigateTo(result: SearchResult) {
+  const list = query.trim().length >= 2 ? results : quickLinks;
+
+  function go(result: SearchResult) {
     setOpen(false);
-    if (result.type === "trip") {
-      router.push(`/${slug}/${role === "traveler" ? "traveler" : "admin"}/trips/${result.id}`);
-    } else {
-      router.push(`/${slug}/traveler/expenses`);
-    }
+    setQuery("");
+    if (result.id === "__trips") return router.push(`${root}/trips`);
+    if (result.id === "__capture") return router.push(`/${slug}/traveler/capture`);
+    if (result.id === "__review") return router.push(`/${slug}/admin/expenses`);
+    if (result.type === "trip") return router.push(`${root}/trips/${result.id}`);
+    router.push(role === "traveler" ? `/${slug}/traveler/expenses` : `/${slug}/admin/expenses?tab=all`);
   }
 
-  const trips = results.filter((r) => r.type === "trip");
-  const expenses = results.filter((r) => r.type === "expense");
-
   return (
-    <div className="relative" ref={ref}>
+    <>
       <button
-        className="icon-button"
-        title="Search"
-        aria-label="Search"
-        onClick={() => setOpen((v) => !v)}
+        type="button"
+        onClick={() => setOpen(true)}
+        className="hidden h-9 w-56 items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm text-subtle shadow-xs transition-colors hover:border-border-strong md:flex"
       >
         <Search className="size-4" />
+        <span className="flex-1 text-left">Search…</span>
+        <kbd className="rounded border border-border bg-muted px-1.5 text-[0.6875rem] font-medium text-muted-foreground">⌘K</kbd>
+      </button>
+      <button type="button" onClick={() => setOpen(true)} className="icon-button md:hidden" aria-label="Search">
+        <Search className="size-[1.125rem]" />
       </button>
 
-      {open && (
-        <div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-80 rounded-xl border border-border bg-popover shadow-soft overflow-hidden animate-fade-in">
-          {/* Input */}
-          <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
-            <Search className="size-3.5 shrink-0 text-muted-foreground" />
+      <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setQuery(""); }}>
+        <DialogContent className="top-[12%] translate-y-0 gap-0 overflow-hidden p-0 sm:max-w-lg" showCloseButton={false}>
+          <DialogTitle className="sr-only">Search</DialogTitle>
+          <div className="flex items-center gap-3 border-b border-border px-4">
+            <Search className="size-4 shrink-0 text-muted-foreground" />
             <input
-              ref={inputRef}
-              type="text"
+              autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search trips, expenses…"
-              className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+              onKeyDown={(e) => {
+                if (e.key === "ArrowDown") { e.preventDefault(); setActiveIndex((i) => Math.min(i + 1, list.length - 1)); }
+                if (e.key === "ArrowUp") { e.preventDefault(); setActiveIndex((i) => Math.max(i - 1, 0)); }
+                if (e.key === "Enter" && list[activeIndex]) { e.preventDefault(); go(list[activeIndex]); }
+              }}
+              placeholder="Search trips and expenses"
+              className="h-14 flex-1 bg-transparent text-[0.9375rem] outline-none placeholder:text-subtle"
             />
-            {loading ? (
-              <Spinner className="size-3.5 text-muted-foreground" />
-            ) : query ? (
-              <button onClick={() => setQuery("")} className="text-muted-foreground hover:text-foreground" aria-label="Clear">
-                <X className="size-3.5" />
-              </button>
-            ) : null}
+            {loading && <Spinner className="size-4 text-muted-foreground" />}
           </div>
-
-          {/* Results */}
-          {query.trim() && !loading && results.length === 0 && (
-            <p className="px-3 py-4 text-center text-xs text-muted-foreground">No results for &quot;{query}&quot;</p>
-          )}
-
-          {!query.trim() && (
-            <p className="px-3 py-4 text-center text-xs text-muted-foreground">Type to search trips and expenses</p>
-          )}
-
-          {results.length > 0 && (
-            <div className="max-h-72 overflow-y-auto py-1">
-              {trips.length > 0 && (
-                <div>
-                  <p className="px-3 pb-1 pt-2 text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground">Trips</p>
-                  {trips.map((r) => {
-                    const idx = results.indexOf(r);
-                    return (
-                      <button
-                        key={r.id}
-                        className={cn(
-                          "flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-secondary transition-colors",
-                          activeIndex === idx && "bg-secondary"
-                        )}
-                        onClick={() => navigateTo(r)}
-                        onMouseEnter={() => setActiveIndex(idx)}
-                      >
-                        <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                          <Plane className="size-3" />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate font-medium">{r.label}</span>
-                          {r.sub && <span className="block truncate text-xs text-muted-foreground">{r.sub}</span>}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {expenses.length > 0 && (
-                <div>
-                  <p className="px-3 pb-1 pt-2 text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground">Expenses</p>
-                  {expenses.map((r) => {
-                    const idx = results.indexOf(r);
-                    return (
-                      <button
-                        key={r.id}
-                        className={cn(
-                          "flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-secondary transition-colors",
-                          activeIndex === idx && "bg-secondary"
-                        )}
-                        onClick={() => navigateTo(r)}
-                        onMouseEnter={() => setActiveIndex(idx)}
-                      >
-                        <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-secondary text-muted-foreground">
-                          <Receipt className="size-3" />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate font-medium">{r.label}</span>
-                          {r.sub && <span className="block truncate text-xs text-muted-foreground">{r.sub}</span>}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+          <div className="max-h-80 overflow-y-auto p-2">
+            {query.trim().length < 2 && <p className="px-2 pb-1 pt-1 text-xs font-medium text-subtle">Jump to</p>}
+            {query.trim().length >= 2 && !loading && results.length === 0 && (
+              <p className="px-3 py-8 text-center text-sm text-muted-foreground">No trips or expenses match “{query}”.</p>
+            )}
+            {list.map((r, idx) => (
+              <button
+                key={`${r.type}-${r.id}`}
+                onClick={() => go(r)}
+                onMouseEnter={() => setActiveIndex(idx)}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors",
+                  activeIndex === idx && "bg-muted"
+                )}
+              >
+                <span className={cn("icon-tile size-8", r.type === "trip" && "icon-tile-primary")}>
+                  {r.type === "trip" ? <MapIcon className="size-4" /> : <Receipt className="size-4" />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">{r.label}</span>
+                  {r.sub && <span className="block truncate text-xs text-muted-foreground">{r.sub}</span>}
+                </span>
+                {activeIndex === idx && <ChevronRight className="size-4 text-subtle" />}
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
-/* ── Notification button ────────────────────────────────────────────────── */
-function NotifButton({ slug, role }: { slug: string; role: "admin" | "manager" | "traveler" }) {
-  const [counts, setCounts] = useState<NotifCounts | null>(null);
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const pathname = usePathname();
-
-  useEffect(() => {
-    fetch("/api/notifications")
-      .then((r) => r.json())
-      .then(setCounts)
-      .catch(() => {});
-  }, [pathname]);
-
-  useEffect(() => {
-    if (!open) return;
-    function onClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("mousedown", onClick);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onClick);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
+/* ── Notifications ──────────────────────────────────────────────────────── */
+function NotificationsMenu({ slug, role, counts }: { slug: string; role: Role; counts: NotifCounts | null }) {
   const total = counts?.total ?? 0;
   const admin = `/${slug}/admin`;
   const traveler = `/${slug}/traveler`;
   const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
   const items = counts
-    ? [
+    ? ([
         role !== "traveler" && counts.pendingExpenses > 0 && {
-          key: "review", href: `${admin}/expenses`, icon: Receipt, tone: "blue",
+          key: "review", href: `${admin}/expenses`, icon: Receipt, tone: "bg-accent text-primary",
           title: `${plural(counts.pendingExpenses, "expense")} to review`, sub: "Submitted and waiting for a decision",
         },
         role !== "traveler" && counts.awaitingPayment > 0 && {
-          key: "pay", href: `${admin}/expenses?tab=approved`, icon: Wallet, tone: "teal",
+          key: "pay", href: `${admin}/expenses?tab=approved`, icon: Wallet, tone: "bg-mint/15 text-teal-700 dark:text-teal-300",
           title: `${plural(counts.awaitingPayment, "expense")} to pay`, sub: "Approved and owed to travelers",
         },
         role !== "traveler" && counts.pendingApprovals > 0 && {
-          key: "trips", href: admin, icon: Plane, tone: "amber",
+          key: "trips", href: `${admin}/trips`, icon: Plane, tone: "bg-amber-500/12 text-amber-700 dark:text-amber-300",
           title: `${plural(counts.pendingApprovals, "trip request")} pending`, sub: "Travel approvals awaiting a decision",
         },
         counts.rejectedExpenses > 0 && {
-          key: "rejected", href: `${traveler}/expenses?status=rejected`, icon: X, tone: "rose",
+          key: "rejected", href: `${traveler}/expenses?status=rejected`, icon: X, tone: "bg-destructive/10 text-destructive",
           title: `${plural(counts.rejectedExpenses, "expense")} sent back`, sub: "Fix and resubmit to get paid",
         },
         counts.draftExpenses > 0 && {
-          key: "drafts", href: `${traveler}/expenses?status=draft`, icon: Send, tone: "neutral",
+          key: "drafts", href: `${traveler}/expenses?status=draft`, icon: Send, tone: "bg-muted text-muted-foreground",
           title: `${plural(counts.draftExpenses, "draft")} not submitted`, sub: "Submit when you're ready",
         },
-      ].filter(Boolean) as { key: string; href: string; icon: typeof Bell; tone: string; title: string; sub: string }[]
+      ].filter(Boolean) as { key: string; href: string; icon: typeof Bell; tone: string; title: string; sub: string }[])
     : [];
 
-  const toneCls: Record<string, string> = {
-    blue: "bg-blue-100 text-blue-700 dark:bg-blue-400/15 dark:text-blue-300",
-    teal: "bg-teal-100 text-teal-700 dark:bg-teal-400/15 dark:text-teal-300",
-    amber: "bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300",
-    rose: "bg-rose-100 text-rose-700 dark:bg-rose-400/15 dark:text-rose-300",
-    neutral: "bg-secondary text-muted-foreground",
-  };
-
   return (
-    <div className="relative" ref={ref}>
-      <button
-        className="icon-button relative"
-        title="Notifications"
-        aria-label={total > 0 ? `Notifications, ${total} need attention` : "Notifications"}
-        onClick={() => setOpen((v) => !v)}
-      >
-        <Bell className="size-4" />
-        {total > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex size-4 items-center justify-center rounded-full bg-rose-500 text-[0.6rem] font-bold text-white leading-none">
-            {total > 9 ? "9+" : total}
-          </span>
-        )}
-      </button>
-
-      {open && (
-        <div className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-72 rounded-xl border border-border bg-popover shadow-soft overflow-hidden animate-fade-in">
-          <div className="border-b border-border px-3 py-2.5">
-            <p className="text-sm font-semibold">Needs your attention</p>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="icon-button relative" aria-label={total > 0 ? `Notifications, ${total} need attention` : "Notifications"}>
+          <Bell className="size-[1.125rem]" />
+          {total > 0 && (
+            <span className="absolute right-1 top-1 flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[0.625rem] font-bold leading-4 text-white">
+              {total > 9 ? "9+" : total}
+            </span>
+          )}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-80 p-0">
+        <div className="border-b border-border px-4 py-3">
+          <p className="text-sm font-semibold">Needs your attention</p>
+        </div>
+        {items.length === 0 ? (
+          <div className="px-4 py-8 text-center">
+            <span className="empty-state-icon mx-auto size-10"><Check className="size-5" /></span>
+            <p className="text-sm text-muted-foreground">You&apos;re all caught up.</p>
           </div>
-
-          {items.length === 0 ? (
-            <p className="px-3 py-5 text-center text-xs text-muted-foreground">All caught up — nothing pending.</p>
-          ) : (
-            <div className="py-1">
-              {items.map(({ key, href, icon: Icon, tone, title, sub }) => (
-                <Link
-                  key={key}
-                  href={href}
-                  onClick={() => setOpen(false)}
-                  className="flex items-center gap-2.5 px-3 py-2.5 transition-colors hover:bg-secondary/60"
-                >
-                  <span className={cn("flex size-7 shrink-0 items-center justify-center rounded-md", toneCls[tone])}>
-                    <Icon className="size-3.5" />
+        ) : (
+          <div className="p-1.5">
+            {items.map(({ key, href, icon: Icon, tone, title, sub }) => (
+              <DropdownMenuItem key={key} asChild className="rounded-lg p-2.5">
+                <Link href={href} className="flex items-center gap-3">
+                  <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-lg", tone)}>
+                    <Icon className="size-4" />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-medium">{title}</span>
                     <span className="block text-xs text-muted-foreground">{sub}</span>
                   </span>
-                  <ChevronRight className="size-3.5 text-muted-foreground/60" />
                 </Link>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+              </DropdownMenuItem>
+            ))}
+          </div>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
-/* ── Org switcher ───────────────────────────────────────────────────────── */
-function OrgSwitcher({ slug }: { slug: string }) {
+/* ── Workspace switcher ─────────────────────────────────────────────────── */
+function WorkspaceSwitcher({ slug, collapsed, compactTrigger }: { slug: string; collapsed?: boolean; compactTrigger?: boolean }) {
   const [orgs, setOrgs] = useState<OrgEntry[]>([]);
-  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/me/orgs").then((r) => r.json()).then(setOrgs).catch(() => {});
   }, []);
 
   const current = orgs.find((o) => o.slug === slug);
-  const displayName = current?.name ?? slug;
+  const name = current?.name ?? slug;
+  const initial = name[0]?.toUpperCase() ?? "W";
+  const roleLabel = current ? roleName(current.role) : "Workspace";
+
+  const trigger = compactTrigger ? (
+    <button className="flex max-w-[11rem] items-center gap-1.5 rounded-lg px-1.5 py-1 text-sm font-semibold hover:bg-muted" aria-label="Switch workspace">
+      <span className="truncate">{name}</span>
+      <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
+    </button>
+  ) : (
+    <button
+      className={cn(
+        "mt-3 flex w-full items-center gap-2.5 rounded-lg border border-border bg-card p-2 text-left shadow-xs transition-colors hover:border-border-strong",
+        collapsed && "justify-center border-transparent bg-transparent p-1 shadow-none"
+      )}
+      aria-label="Switch workspace"
+      title={collapsed ? name : undefined}
+    >
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-gradient-brand text-sm font-bold text-white">
+        {initial}
+      </span>
+      {!collapsed && (
+        <>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-semibold leading-tight">{name}</span>
+            <span className="block truncate text-xs text-muted-foreground">{roleLabel}</span>
+          </span>
+          <ChevronsUpDown className="size-4 shrink-0 text-subtle" />
+        </>
+      )}
+    </button>
+  );
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <button
-          className="flex max-w-[9rem] items-center gap-1.5 overflow-hidden rounded-md px-2 py-1.5 text-sm font-semibold transition-colors hover:bg-secondary"
-          aria-label="Switch workspace"
-        >
-          <span className="brand-letter-mark size-5 shrink-0 rounded-[0.3rem] text-[0.6rem]">
-            {displayName[0]?.toUpperCase() ?? "W"}
-          </span>
-          <span className="truncate">{displayName}</span>
-          <ChevronDown className="size-3 shrink-0 text-muted-foreground" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-60">
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-64">
         {orgs.length > 0 && (
           <>
-            <p className="px-2.5 pb-1 pt-2 text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground">
-              Workspaces
-            </p>
+            <p className="px-2.5 pb-1 pt-2 text-xs font-medium text-subtle">Workspaces</p>
             {orgs.map((org) => (
               <form key={org.id} action={switchOrgAction}>
                 <input type="hidden" name="organizationId" value={org.id} />
                 <input type="hidden" name="slug" value={org.slug} />
                 <input type="hidden" name="role" value={org.role} />
                 <DropdownMenuItem asChild>
-                  <button type="submit" className="w-full cursor-pointer">
-                    <span className="brand-letter-mark mr-2 size-5 shrink-0 rounded-[0.3rem] text-[0.6rem]">
+                  <button type="submit" className="flex w-full cursor-pointer items-center gap-2.5">
+                    <span className="flex size-6 shrink-0 items-center justify-center rounded bg-gradient-brand text-[0.6875rem] font-bold text-white">
                       {org.name[0]?.toUpperCase()}
                     </span>
-                    <span className="truncate flex-1">{org.name}</span>
-                    {org.slug === slug && <Check className="size-3.5 text-primary shrink-0" />}
+                    <span className="min-w-0 flex-1 text-left">
+                      <span className="block truncate">{org.name}</span>
+                      <span className="block truncate text-xs text-muted-foreground">{roleName(org.role)}</span>
+                    </span>
+                    {org.slug === slug && <Check className="size-4 shrink-0 text-primary" />}
                   </button>
                 </DropdownMenuItem>
               </form>
@@ -655,146 +662,76 @@ function OrgSwitcher({ slug }: { slug: string }) {
   );
 }
 
-/* ── Breadcrumb dropdown ────────────────────────────────────────────────── */
-function BreadcrumbDropdown({ item, currentPathname }: { item: BreadcrumbItem; currentPathname: string }) {
-  const peers = item.items ?? [];
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button className="flex max-w-[12rem] items-center gap-1 overflow-hidden rounded-md px-2 py-1 text-sm font-semibold text-foreground hover:bg-secondary transition-colors group">
-          <span className="truncate">{item.label}</span>
-          <ChevronDown className="size-3 shrink-0 text-muted-foreground group-hover:text-foreground transition-colors" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-60">
-        {peers.length > 0 && (
-          <p className="px-2.5 pb-1 pt-2 text-[0.65rem] font-semibold uppercase tracking-widest text-muted-foreground">
-            Switch
-          </p>
-        )}
-        {peers.map((sub) => {
-          const active = currentPathname.startsWith(sub.href);
-          return (
-            <DropdownMenuItem key={sub.href} asChild>
-              <Link href={sub.href} className={cn("flex items-center justify-between gap-2", active && "text-primary")}>
-                <span className="truncate">{sub.label}</span>
-                {active && <Check className="size-3.5 shrink-0" />}
-              </Link>
-            </DropdownMenuItem>
-          );
-        })}
-        {peers.length === 0 && !item.addHref && (
-          <p className="px-3 py-3 text-center text-sm text-muted-foreground">No other items</p>
-        )}
-        {item.addHref && (
-          <>
-            {peers.length > 0 && <DropdownMenuSeparator />}
-            <DropdownMenuItem asChild>
-              <Link
-                href={item.addHref}
-                className="flex items-center gap-2 text-sm font-semibold text-primary"
-              >
-                <span className="flex size-4 items-center justify-center rounded-full bg-primary/12">
-                  <Plus className="size-2.5" />
-                </span>
-                {item.addLabel ?? "New"}
-              </Link>
-            </DropdownMenuItem>
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-/* ── Helpers ────────────────────────────────────────────────────────────── */
-function getWorkspaceSlug(pathname: string) {
-  const [segment] = pathname.split("/").filter(Boolean);
-  return segment && !["dashboard", "login", "register", "onboarding"].includes(segment)
-    ? segment : "workspace";
-}
-
-function isActive(pathname: string, href: string) {
-  const path = pathname.replace(/\/$/, "") || "/";
-  const h = href.split("?")[0].replace(/\/$/, "") || "/";
-  if (path === h) return true;
-  // For root admin/traveler, activate for nested routes that aren't named siblings
-  if (/\/(admin|traveler)$/.test(h)) {
-    const after = path.slice(h.length);
-    if (!after.startsWith("/")) return false;
-    const seg = after.slice(1).split("/")[0];
-    return !["analytics", "settings", "capture", "expenses", "documents"].includes(seg);
-  }
-  return path.startsWith(`${h}/`);
-}
-
 /* ── Account menu ───────────────────────────────────────────────────────── */
 function AccountMenu({
-  userName, userEmail, role, slug, collapsed, onSignOut, signingOut, asIconOnly,
+  me, role, slug, collapsed, iconOnly, onSignOut, signingOut,
 }: {
-  userName: string; userEmail: string;
-  role: "admin" | "manager" | "traveler"; slug: string;
+  me: MeResponse | null;
+  role: Role;
+  slug: string;
   collapsed: boolean;
-  onSignOut: () => void; signingOut: boolean; asIconOnly?: boolean;
+  iconOnly?: boolean;
+  onSignOut: () => void;
+  signingOut: boolean;
 }) {
-  const initials = userName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() || "?";
+  const userName = me?.name ?? "Account";
+  const userEmail = me?.email ?? "";
+  const initials = userName.split(/[\s.@_-]+/).filter(Boolean).map((n) => n[0]).join("").slice(0, 2).toUpperCase() || "?";
+  const canSwitchView = me?.organizationRole ? ["owner", "admin", "manager"].includes(me.organizationRole) : role !== "traveler";
 
-  const trigger = asIconOnly ? (
-    <button
-      className="icon-button"
-      type="button"
-      aria-label="Account"
-      title="Account"
-    >
-      <span className="flex size-5 items-center justify-center rounded-md bg-gradient-primary text-[0.6rem] font-bold text-primary-foreground">
-        {initials}
-      </span>
+  const trigger = iconOnly ? (
+    <button className="icon-button" type="button" aria-label="Account">
+      <span className="avatar size-7 text-[0.6875rem]">{initials}</span>
     </button>
   ) : (
     <button
-      className={cn("sidebar-user w-full text-left", collapsed && "sidebar-user-collapsed")}
       type="button"
       aria-label="Account"
+      className={cn("flex w-full items-center gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-sidebar-accent", collapsed && "justify-center")}
     >
-      <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-gradient-primary text-[0.7rem] font-bold text-primary-foreground shadow-elegant">
-        {initials}
-      </span>
+      <span className="avatar size-8">{initials}</span>
       {!collapsed && (
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-semibold text-foreground">{userName}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold leading-tight">{userName}</span>
           <span className="block truncate text-xs text-muted-foreground">{userEmail}</span>
         </span>
       )}
     </button>
   );
 
-  const otherHref = role === "traveler" ? `/${slug}/admin` : `/${slug}/traveler`;
-  const switchLabel = role === "traveler" ? "Switch to Admin view" : "Switch to Traveler view";
-
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        {trigger}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <div className="flex items-center gap-2.5 px-3 py-2.5">
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-primary text-[0.75rem] font-bold text-primary-foreground">
-            {initials}
-          </span>
+      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+      <DropdownMenuContent align={iconOnly ? "end" : "start"} side={iconOnly ? "bottom" : "top"} className="w-60">
+        <div className="flex items-center gap-2.5 px-2.5 py-2">
+          <span className="avatar size-9">{initials}</span>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">{userName}</p>
             <p className="truncate text-xs text-muted-foreground">{userEmail}</p>
           </div>
         </div>
         <DropdownMenuSeparator />
+        {canSwitchView && (
+          <DropdownMenuItem asChild>
+            <Link href={role === "traveler" ? `/${slug}/admin` : `/${slug}/traveler`} className="flex items-center gap-2">
+              <ArrowLeftRight className="size-4" /> {role === "traveler" ? "Switch to admin view" : "Switch to my travel view"}
+            </Link>
+          </DropdownMenuItem>
+        )}
+        {role !== "traveler" && (
+          <DropdownMenuItem asChild>
+            <Link href={`/${slug}/admin/settings`} className="flex items-center gap-2">
+              <Users className="size-4" /> People & settings
+            </Link>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem asChild>
-          <Link href={otherHref} className="flex items-center gap-2 text-sm">
-            <UserRound className="size-4" />
-            {switchLabel}
+          <Link href="/docs" className="flex items-center gap-2">
+            <BookOpen className="size-4" /> Help center
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onSignOut} disabled={signingOut} className="text-sm">
+        <DropdownMenuItem onClick={onSignOut} disabled={signingOut} className="flex items-center gap-2">
           {signingOut ? <Spinner className="size-4" /> : <LogOut className="size-4" />}
           Sign out
         </DropdownMenuItem>
@@ -803,25 +740,44 @@ function AccountMenu({
   );
 }
 
-/* ── Status badge ───────────────────────────────────────────────────────── */
-export function StatusBadge({ value }: { value: string }) {
-  const { cls, dot } = (
-    {
-      approved: { cls: "bg-teal-100 text-teal-800 dark:bg-teal-400/15 dark:text-teal-200", dot: "bg-teal-500" },
-      active: { cls: "bg-teal-100 text-teal-800 dark:bg-teal-400/15 dark:text-teal-200", dot: "bg-teal-500" },
-      submitted: { cls: "bg-blue-100 text-blue-800 dark:bg-blue-400/15 dark:text-blue-200", dot: "bg-blue-500" },
-      requested: { cls: "bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-200", dot: "bg-amber-500" },
-      draft: { cls: "bg-secondary text-muted-foreground", dot: "bg-muted-foreground/60" },
-      rejected: { cls: "bg-rose-100 text-rose-800 dark:bg-rose-400/15 dark:text-rose-200", dot: "bg-rose-500" },
-      completed: { cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-200", dot: "bg-emerald-500" },
-      reimbursed: { cls: "bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-200", dot: "bg-emerald-500" },
-    } as Record<string, { cls: string; dot: string }>
-  )[value] ?? { cls: "bg-secondary text-muted-foreground", dot: "bg-muted-foreground/60" };
+/* ── Helpers ────────────────────────────────────────────────────────────── */
+function roleName(role: string) {
+  return ({ owner: "Owner", admin: "Admin", manager: "Manager", traveler: "Traveler" } as Record<string, string>)[role] ?? role;
+}
 
+function getWorkspaceSlug(pathname: string) {
+  const [segment] = pathname.split("/").filter(Boolean);
+  return segment && !["dashboard", "login", "register", "onboarding"].includes(segment) ? segment : "workspace";
+}
+
+function isActive(pathname: string, item: Pick<NavItem, "href" | "exact">) {
+  const path = pathname.replace(/\/$/, "") || "/";
+  const h = item.href.split("?")[0].replace(/\/$/, "") || "/";
+  if (path === h) return true;
+  if (item.exact) return false;
+  return path.startsWith(`${h}/`);
+}
+
+/* ── Status badge ───────────────────────────────────────────────────────── */
+const STATUS_STYLES: Record<string, { cls: string; dot: string; label?: string }> = {
+  approved: { cls: "bg-teal-500/12 text-teal-800 dark:text-teal-200", dot: "bg-teal-500" },
+  active: { cls: "bg-teal-500/12 text-teal-800 dark:text-teal-200", dot: "bg-teal-500" },
+  submitted: { cls: "bg-blue-500/12 text-blue-800 dark:text-blue-200", dot: "bg-blue-500", label: "In review" },
+  requested: { cls: "bg-amber-500/14 text-amber-800 dark:text-amber-200", dot: "bg-amber-500", label: "Pending" },
+  draft: { cls: "bg-muted text-muted-foreground", dot: "bg-subtle" },
+  planning: { cls: "bg-muted text-muted-foreground", dot: "bg-subtle" },
+  rejected: { cls: "bg-rose-500/12 text-rose-800 dark:text-rose-200", dot: "bg-rose-500" },
+  completed: { cls: "bg-emerald-500/12 text-emerald-800 dark:text-emerald-200", dot: "bg-emerald-500" },
+  reimbursed: { cls: "bg-emerald-500/12 text-emerald-800 dark:text-emerald-200", dot: "bg-emerald-500", label: "Paid" },
+  archived: { cls: "bg-muted text-muted-foreground", dot: "bg-subtle" },
+};
+
+export function StatusBadge({ value, label }: { value: string; label?: string }) {
+  const style = STATUS_STYLES[value] ?? { cls: "bg-muted text-muted-foreground", dot: "bg-subtle" };
   return (
-    <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium capitalize", cls)}>
-      <span className={cn("size-1.5 shrink-0 rounded-full", dot)} />
-      {value}
+    <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap", style.cls)}>
+      <span className={cn("size-1.5 shrink-0 rounded-full", style.dot)} />
+      {label ?? style.label ?? value.charAt(0).toUpperCase() + value.slice(1)}
     </span>
   );
 }
