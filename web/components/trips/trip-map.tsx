@@ -73,7 +73,9 @@ export function TripMap({
     let cancelled = false;
     let map: MapLibreMap | null = null;
     (async () => {
-      const lib = await import("maplibre-gl");
+      // maplibre-gl v5 ships a UMD bundle; depending on the bundler the API sits on `default`.
+      const mod = await import("maplibre-gl");
+      const lib = ((mod as unknown as { default?: typeof mod }).default ?? mod) as typeof mod;
       if (cancelled || !containerRef.current) return;
       libRef.current = lib;
       map = new lib.Map({
@@ -166,21 +168,25 @@ export function TripMap({
     if (!map || !lib || !ready) return;
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = stops.map((stop, index) => {
+      // MapLibre owns the marker element's transform, so the rotated teardrop lives inside it.
       const el = document.createElement("button");
       el.type = "button";
-      el.className = "map-pin";
-      el.dataset.kind = stop.kind ?? "stop";
-      el.dataset.active = String(stop.id === activeStopId);
+      el.className = "map-marker";
       el.setAttribute("aria-label", `Stop ${index + 1}: ${stop.name}`);
       el.title = stop.name;
+      const pin = document.createElement("span");
+      pin.className = "map-pin";
+      pin.dataset.kind = stop.kind ?? "stop";
+      pin.dataset.active = String(stop.id === activeStopId);
       const label = document.createElement("span");
       label.textContent = String(index + 1);
-      el.appendChild(label);
+      pin.appendChild(label);
+      el.appendChild(pin);
       el.addEventListener("click", (event) => {
         event.stopPropagation();
         handlersRef.current.onStopClick?.(stop.id);
       });
-      return new lib.Marker({ element: el, anchor: "bottom-left", offset: [-2, 2] })
+      return new lib.Marker({ element: el, anchor: "bottom" })
         .setLngLat([stop.longitude, stop.latitude])
         .addTo(map);
     });
@@ -216,13 +222,14 @@ export function TripMap({
       return;
     }
     const bounds = points.reduce((b, p) => b.extend(p), new lib.LngLatBounds(points[0], points[0]));
-    map.fitBounds(bounds, { padding: { top: 56, bottom: 56, left: 56, right: 56 }, maxZoom: 13, duration: 600 });
+    map.fitBounds(bounds, { padding: { top: 80, bottom: 56, left: 56, right: 64 }, maxZoom: 13, duration: 600 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [frameKey, ready]);
 
   return (
     <div className={cn("map-frame", className)}>
-      <div ref={containerRef} className="absolute inset-0" />
+      {/* Inline position: maplibre-gl.css (unlayered) would override utility classes here. */}
+      <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
       {tilesFailed && (
         <div className="pointer-events-none absolute left-3 top-3 z-10 flex max-w-[calc(100%-5rem)] items-center gap-2 rounded-lg border border-border bg-card/95 px-3 py-2 text-xs text-muted-foreground shadow-soft">
           <MapPinOff className="size-3.5 shrink-0" />

@@ -1,44 +1,36 @@
-import { UserRound } from "lucide-react";
+import Link from "next/link";
+import { Building2, Mail, ShieldCheck } from "lucide-react";
 import { cookies } from "next/headers";
 import { AppShell } from "@/components/layout/navigation";
+import { PageHeader } from "@/components/layout/page";
 import { apiClient } from "@/lib/api-client";
 
 export default async function TravelerAccountPage() {
   const api = apiClient({ cookie: (await cookies()).toString() });
   const currentUser = await api.auth.me();
-
-  const initials = currentUser.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase() || "?";
+  const initials = currentUser.name.split(/[\s.@_-]+/).filter(Boolean).map((n) => n[0]).join("").slice(0, 2).toUpperCase() || "?";
 
   return (
-    <AppShell role="traveler" breadcrumbs={[{ label: "Account" }]}>
-      <section className="w-full max-w-xl space-y-5">
-        <div>
-          <h1 className="text-xl font-bold">Account</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">Your profile.</p>
-        </div>
-
-        {/* ── Profile ── */}
-        <article className="card">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
-              <UserRound className="size-3.5" />
-            </span>
-            <h2 className="text-base font-semibold">Profile</h2>
+    <AppShell role="traveler" personal breadcrumbs={[{ label: "Account" }]}>
+      <PageHeader title="Account" description="Your profile and workspace." />
+      <div className="grid max-w-3xl gap-5">
+        <section className="card flex flex-wrap items-center gap-4">
+          <span className="avatar size-14 text-lg">{initials}</span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-lg font-semibold">{currentUser.name}</p>
+            <p className="flex items-center gap-1.5 truncate text-sm text-muted-foreground"><Mail className="size-4" />{currentUser.email}</p>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-gradient-primary text-sm font-bold text-primary-foreground shadow-elegant">
-              {initials}
-            </span>
-            <div className="min-w-0">
-              <p className="truncate font-semibold">{currentUser.name}</p>
-              <p className="truncate text-sm text-muted-foreground">{currentUser.email}</p>
-              <p className="mt-0.5 text-xs capitalize text-muted-foreground rounded-full border border-border inline-block px-2 py-0.5">
-                {currentUser.organizationRole}
-              </p>
-            </div>
+          <span className="chip"><ShieldCheck className="size-3.5" /> Passwordless sign-in</span>
+        </section>
+        <section className="card flex flex-wrap items-center gap-4">
+          <span className="icon-tile icon-tile-primary"><Building2 className="size-5" /></span>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold">Travelling with a team?</p>
+            <p className="text-sm text-muted-foreground">Create a company workspace to invite colleagues, approve trips and pay back expenses together.</p>
           </div>
-        </article>
-      </section>
+          <Link href="/onboarding" className="secondary-button">Create team workspace</Link>
+        </section>
+      </div>
     </AppShell>
   );
 }

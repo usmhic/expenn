@@ -1035,6 +1035,16 @@
     filter: invert(1);
   }
 
+  .map-marker {
+    display: flex;
+    height: 2.5rem;
+    width: 2.25rem;
+    align-items: flex-start;
+    justify-content: center;
+    cursor: pointer;
+    background: none;
+  }
+
   .map-pin {
     display: flex;
     height: 1.875rem;

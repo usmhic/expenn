@@ -36,7 +36,7 @@ export type BreadcrumbItem = {
 };
 
 type Role = "admin" | "manager" | "traveler";
-type OrgEntry = { id: string; name: string; slug: string; role: string };
+type OrgEntry = { id: string; name: string; slug: string; role?: string; accountType?: string };
 type NavItem = { label: string; href: string; icon: typeof Home; badgeKey?: keyof NotifCounts; exact?: boolean };
 type NavSection = { label: string; items: NavItem[] };
 
@@ -136,8 +136,10 @@ export function AppShell({
   const [collapsed, setCollapsed] = useState(false);
   const [me, setMe] = useState<MeResponse | null>(null);
   const [counts, setCounts] = useState<NotifCounts | null>(null);
+  const [orgs, setOrgs] = useState<OrgEntry[]>([]);
   const slug = getWorkspaceSlug(pathname);
-  const sections = navFor(slug, role, personal);
+  const isPersonal = personal ?? orgs.find((o) => o.slug === slug)?.accountType === "personal";
+  const sections = navFor(slug, role, isPersonal);
   const mobileNav = mobileNavFor(slug, role);
 
   useEffect(() => {
@@ -147,6 +149,10 @@ export function AppShell({
   useEffect(() => {
     fetch("/api/notifications").then((r) => r.json()).then(setCounts).catch(() => {});
   }, [pathname]);
+
+  useEffect(() => {
+    fetch("/api/me/orgs").then((r) => r.json()).then(setOrgs).catch(() => {});
+  }, []);
 
   useEffect(() => {
     try {
@@ -190,7 +196,7 @@ export function AppShell({
           )}
         </div>
 
-        <WorkspaceSwitcher slug={slug} collapsed={collapsed} />
+        <WorkspaceSwitcher orgs={orgs} slug={slug} collapsed={collapsed} />
 
         {role === "traveler" && (
           <Link
@@ -274,7 +280,7 @@ export function AppShell({
               <BrandMark className="size-8" />
             </Link>
             <div className="lg:hidden min-w-0">
-              <WorkspaceSwitcher slug={slug} compactTrigger />
+              <WorkspaceSwitcher orgs={orgs} slug={slug} compactTrigger />
             </div>
             <Breadcrumbs items={breadcrumbs} pathname={pathname} />
           </div>
@@ -582,17 +588,11 @@ function NotificationsMenu({ slug, role, counts }: { slug: string; role: Role; c
 }
 
 /* ── Workspace switcher ─────────────────────────────────────────────────── */
-function WorkspaceSwitcher({ slug, collapsed, compactTrigger }: { slug: string; collapsed?: boolean; compactTrigger?: boolean }) {
-  const [orgs, setOrgs] = useState<OrgEntry[]>([]);
-
-  useEffect(() => {
-    fetch("/api/me/orgs").then((r) => r.json()).then(setOrgs).catch(() => {});
-  }, []);
-
+function WorkspaceSwitcher({ orgs, slug, collapsed, compactTrigger }: { orgs: OrgEntry[]; slug: string; collapsed?: boolean; compactTrigger?: boolean }) {
   const current = orgs.find((o) => o.slug === slug);
   const name = current?.name ?? slug;
   const initial = name[0]?.toUpperCase() ?? "W";
-  const roleLabel = current ? roleName(current.role) : "Workspace";
+  const roleLabel = current ? workspaceLabel(current) : "Workspace";
 
   const trigger = compactTrigger ? (
     <button className="flex max-w-[11rem] items-center gap-1.5 rounded-lg px-1.5 py-1 text-sm font-semibold hover:bg-muted" aria-label="Switch workspace">
@@ -634,7 +634,7 @@ function WorkspaceSwitcher({ slug, collapsed, compactTrigger }: { slug: string; 
               <form key={org.id} action={switchOrgAction}>
                 <input type="hidden" name="organizationId" value={org.id} />
                 <input type="hidden" name="slug" value={org.slug} />
-                <input type="hidden" name="role" value={org.role} />
+                {org.role && <input type="hidden" name="role" value={org.role} />}
                 <DropdownMenuItem asChild>
                   <button type="submit" className="flex w-full cursor-pointer items-center gap-2.5">
                     <span className="flex size-6 shrink-0 items-center justify-center rounded bg-gradient-brand text-[0.6875rem] font-bold text-white">
@@ -642,7 +642,7 @@ function WorkspaceSwitcher({ slug, collapsed, compactTrigger }: { slug: string; 
                     </span>
                     <span className="min-w-0 flex-1 text-left">
                       <span className="block truncate">{org.name}</span>
-                      <span className="block truncate text-xs text-muted-foreground">{roleName(org.role)}</span>
+                      <span className="block truncate text-xs text-muted-foreground">{workspaceLabel(org)}</span>
                     </span>
                     {org.slug === slug && <Check className="size-4 shrink-0 text-primary" />}
                   </button>
@@ -741,8 +741,9 @@ function AccountMenu({
 }
 
 /* ── Helpers ────────────────────────────────────────────────────────────── */
-function roleName(role: string) {
-  return ({ owner: "Owner", admin: "Admin", manager: "Manager", traveler: "Traveler" } as Record<string, string>)[role] ?? role;
+function workspaceLabel(org: OrgEntry) {
+  if (org.role) return ({ owner: "Owner", admin: "Admin", manager: "Manager", traveler: "Traveler" } as Record<string, string>)[org.role] ?? org.role;
+  return org.accountType === "personal" ? "Personal workspace" : "Team workspace";
 }
 
 function getWorkspaceSlug(pathname: string) {

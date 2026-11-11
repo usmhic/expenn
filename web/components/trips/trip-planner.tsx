@@ -382,7 +382,7 @@ export function TripPlanner({
               </p>
             </div>
           ) : (
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+            <DndContext id={`itinerary-${tripId}`} sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
               <SortableContext items={stops.map((s) => s.key)} strategy={verticalListSortingStrategy}>
                 <ol className="space-y-0.5">
                   {stops.map((stop, index) => (
@@ -562,6 +562,11 @@ function PlaceSearch({ near, onPick }: { near?: { lat: number; lon: number }; on
   );
 }
 
+function shortDate(iso: string) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(y, m - 1, d)));
+}
+
 /* ── Stop row ───────────────────────────────────────────────────────────── */
 function SortableStop({
   stop, index, last, leg, active, expanded, canEdit, minDate, maxDate, onSelect, onToggle, onChange, onRemove,
@@ -582,7 +587,7 @@ function SortableStop({
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: stop.key, disabled: !canEdit });
   const kindLabel = STOP_KINDS.find((k) => k.value === stop.kind)?.label ?? "Stop";
-  const dates = [stop.arriveOn, stop.departOn].filter(Boolean);
+  const dates = [stop.arriveOn, stop.departOn].filter((d): d is string => Boolean(d)).map(shortDate);
 
   return (
     <li

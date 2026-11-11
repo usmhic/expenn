@@ -1,34 +1,17 @@
 import { notFound } from "next/navigation";
-import {
-  CalendarDays, CheckCircle2, Clock, ImageOff, MapPin, Users, XCircle,
-} from "lucide-react";
+import { CalendarDays, CheckCircle2, MapPin, Receipt, Route as RouteIcon, Users, Wallet, XCircle } from "lucide-react";
 import { cookies } from "next/headers";
 import { AppShell, StatusBadge, type BreadcrumbItem } from "@/components/layout/navigation";
+import { PageHeader, SectionCard, Stat } from "@/components/layout/page";
 import { AssignTravelersDialog, InviteMemberDialog, ReviewApprovalButtons } from "@/components/dialogs";
 import { ExpenseTable, type CommentRow } from "@/components/expense-table";
-import { HeroStat } from "@/components/ui/hero-stat";
-import { apiClient } from "@/lib/api-client";
+import { TripPlannerSection } from "@/components/trips/trip-planner-section";
+import { apiClient, type ItineraryDto } from "@/lib/api-client";
+import { formatMoney } from "@/lib/expenses";
+import { formatDateRange, formatDistance, formatDuration, tripDays, tripPhase } from "@/lib/trips";
 
-function fmt(date: string | Date) {
-  const dateObj = typeof date === "string" ? new Date(date) : date;
-  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(dateObj);
-}
-
-function daysLabel(start: string | Date, end: string | Date) {
-  const startDate = typeof start === "string" ? new Date(start) : start;
-  const endDate = typeof end === "string" ? new Date(end) : end;
-  const now = new Date();
-  const totalMs = endDate.getTime() - startDate.getTime();
-  const totalDays = Math.max(1, Math.ceil(totalMs / 86_400_000));
-  if (now < startDate) {
-    const inDays = Math.ceil((startDate.getTime() - now.getTime()) / 86_400_000);
-    return { label: `Starts in ${inDays}d`, kind: "upcoming" as const };
-  }
-  if (now > endDate) {
-    return { label: `${totalDays}d trip (ended)`, kind: "ended" as const };
-  }
-  const elapsed = Math.ceil((now.getTime() - startDate.getTime()) / 86_400_000);
-  return { label: `Day ${elapsed} of ${totalDays}`, kind: "active" as const };
+function fmt(date: string) {
+  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(date));
 }
 
 export default async function AdminTripDetailPage({
@@ -40,12 +23,12 @@ export default async function AdminTripDetailPage({
   const adminRoot = `/${workspace}/admin`;
   const api = apiClient({ cookie: (await cookies()).toString() });
   const currentUser = await api.auth.me();
-  const orgId = currentUser.activeOrganizationId || workspace;
+  const orgId = currentUser.activeOrganizationId ?? "";
 
   const trip = await api.trips.getById(tripId).catch(() => null);
   if (!trip) return notFound();
 
-  const [expenses, members, travelers, approvals, allTrips, allTeams, tripComments] = await Promise.all([
+  const [expenses, members, travelers, approvals, allTrips, allTeams, tripComments, itinerary] = await Promise.all([
     api.expenses.list({ tripId }),
     api.organizations.getMembers(orgId),
     api.trips.getTravelers(tripId),
@@ -53,376 +36,190 @@ export default async function AdminTripDetailPage({
     api.trips.list({}),
     api.organizations.getTeams(orgId),
     api.comments.listForTrip(tripId),
+    api.trips.getItinerary(tripId).catch((): ItineraryDto => ({ tripId, profile: "driving-car", stops: [], routingEnabled: false })),
   ]);
   const role = currentUser.organizationRole === "manager" ? "manager" : "admin";
 
-  const assignedUserIds = travelers.map((t) => t.userId);
-
-  // Budget & spend
   // Budget math only counts expenses in the trip's currency.
   const inTripCurrency = expenses.filter((e) => e.currency === trip.currency);
-  const spent = inTripCurrency
-    .filter((e) => ["approved", "reimbursed", "submitted"].includes(e.status))
-    .reduce((s, e) => s + Number(e.amount), 0);
-  const approvedSpend = inTripCurrency
-    .filter((e) => ["approved", "reimbursed"].includes(e.status))
-    .reduce((s, e) => s + Number(e.amount), 0);
+  const approvedSpend = inTripCurrency.filter((e) => ["approved", "reimbursed"].includes(e.status)).reduce((s, e) => s + Number(e.amount), 0);
+  const pendingSpend = inTripCurrency.filter((e) => e.status === "submitted").reduce((s, e) => s + Number(e.amount), 0);
   const budget = Number(trip.budget);
-  const budgetPct = budget > 0 ? Math.min(100, Math.round((approvedSpend / budget) * 100)) : 0;
+  const budgetPct = budget > 0 ? Math.round((approvedSpend / budget) * 100) : 0;
 
-  // Admins only see submitted-and-above expenses (drafts are internal to travelers)
-  const reviewableExpenses = expenses.filter((e) => e.status !== "draft");
-  const pendingExpenses = reviewableExpenses.filter((e) => e.status === "submitted");
-  const missingReceipts = reviewableExpenses.filter((e) => !e.receiptFileUrl).length;
+  // Drafts are private to travelers until submitted.
+  const reviewable = expenses.filter((e) => e.status !== "draft");
+  const pendingExpenses = reviewable.filter((e) => e.status === "submitted");
   const pendingApprovals = approvals.filter((a) => a.status === "requested");
-  const dayInfo = daysLabel(trip.startDate, trip.endDate);
+  const phase = tripPhase(trip.startDate, trip.endDate);
+  const tripTeam = allTeams.find((t) => t.id === trip.teamId);
+  const route = itinerary.route;
 
-  // Group comments by expenseId
   const commentsByExpense = tripComments.reduce<Record<string, CommentRow[]>>((acc, c) => {
-    if (!acc[c.expenseId]) acc[c.expenseId] = [];
-    acc[c.expenseId].push({ ...c, createdAt: new Date(c.createdAt) });
+    (acc[c.expenseId] ??= []).push({ ...c, createdAt: new Date(c.createdAt) });
     return acc;
   }, {});
 
-  // Reimbursement summary
-  const reimbursableByTraveler = reviewableExpenses
+  const owed = reviewable
     .filter((e) => e.reimbursable && ["approved", "reimbursed"].includes(e.status))
-    .reduce<Record<string, { name: string; total: number; currency: string; reimbursed: number }>>((acc, e) => {
-      const member = members.find((m) => m.userId === e.userId);
-      const key = e.userId;
-      if (!acc[key]) acc[key] = { name: member?.name ?? "Unknown", total: 0, currency: e.currency, reimbursed: 0 };
+    .reduce<Record<string, { name: string; currency: string; total: number; paid: number }>>((acc, e) => {
+      const key = `${e.userId}:${e.currency}`;
+      acc[key] ??= { name: e.travelerName ?? members.find((m) => m.userId === e.userId)?.name ?? "Unknown", currency: e.currency, total: 0, paid: 0 };
       acc[key].total += Number(e.amount);
-      if (e.status === "reimbursed") acc[key].reimbursed += Number(e.amount);
+      if (e.status === "reimbursed") acc[key].paid += Number(e.amount);
       return acc;
     }, {});
-  const reimbursementRows = Object.values(reimbursableByTraveler);
-
-  const tripTeam = allTeams.find((t) => t.id === trip.teamId);
 
   const breadcrumbs: BreadcrumbItem[] = [
-    ...(tripTeam
-      ? [
-          {
-            label: tripTeam.name,
-            href: `${adminRoot}/groups/${tripTeam.id}`,
-            items: allTeams
-              .filter((t) => t.id !== tripTeam.id)
-              .map((t) => ({ label: t.name, href: `${adminRoot}/groups/${t.id}` })),
-            addHref: `${adminRoot}/settings`,
-            addLabel: "New group",
-          },
-        ]
-      : [{ label: "Trips", href: adminRoot }]),
+    { label: "Trips", href: `${adminRoot}/trips` },
     {
       label: trip.name,
-      items: allTrips
-        .filter((t) => t.id !== trip.id && t.teamId === trip.teamId)
-        .map((t) => ({ label: t.name, href: `${adminRoot}/trips/${t.id}` })),
-      addHref: adminRoot,
+      items: allTrips.filter((t) => t.id !== trip.id).map((t) => ({ label: t.name, href: `${adminRoot}/trips/${t.id}` })),
+      addHref: `${adminRoot}/trips`,
       addLabel: "New trip",
     },
   ];
 
   return (
     <AppShell role={role} breadcrumbs={breadcrumbs}>
-      <div className="w-full space-y-5">
-
-        {/* ── Hero ──────────────────────────────────────────────────────── */}
-        <article className="trip-detail-hero">
-          <div className="min-w-0 flex-1">
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              <StatusBadge value={trip.status} />
-              {tripTeam && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                  <Users className="size-3" /> {tripTeam.name}
-                </span>
-              )}
-            </div>
-            <h1 className="text-xl font-bold leading-tight">{trip.name}</h1>
-            <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <MapPin className="size-3.5 text-primary/70" />
-                {trip.destination}
-              </span>
-              <span className="flex items-center gap-1">
-                <CalendarDays className="size-3.5 text-primary/70" />
-                {fmt(trip.startDate)} – {fmt(trip.endDate)}
-              </span>
-              <span
-                className={
-                  dayInfo.kind === "active"
-                    ? "font-medium text-teal-600 dark:text-teal-400"
-                    : dayInfo.kind === "upcoming"
-                    ? "font-medium text-blue-600 dark:text-blue-400"
-                    : "text-muted-foreground"
-                }
-              >
-                <Clock className="mr-0.5 inline size-3 -mt-0.5" />
-                {dayInfo.label}
-              </span>
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2 sm:shrink-0">
-            <HeroStat label="Budget" value={`${trip.currency} ${budget.toLocaleString()}`} />
-            <HeroStat
-              label="Approved spend"
-              value={`${trip.currency} ${approvedSpend.toFixed(0)}`}
-              highlight={approvedSpend > budget && budget > 0 ? "over" : undefined}
+      <PageHeader
+        eyebrow={
+          <span className="flex flex-wrap items-center gap-2 normal-case tracking-normal">
+            <StatusBadge value={trip.status} />
+            {tripTeam && <span className="chip py-0.5"><Users className="size-3" />{tripTeam.name}</span>}
+            <span className="text-xs font-medium text-muted-foreground">
+              {phase.kind === "ongoing" ? `Day ${phase.days} of ${tripDays(trip.startDate, trip.endDate)}` : phase.kind === "upcoming" ? `Starts in ${phase.days} day${phase.days === 1 ? "" : "s"}` : "Trip ended"}
+            </span>
+          </span>
+        }
+        title={trip.name}
+        description={
+          <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span className="flex items-center gap-1.5"><MapPin className="size-4" />{trip.routeSummary ?? trip.destination}</span>
+            <span className="flex items-center gap-1.5"><CalendarDays className="size-4" />{formatDateRange(trip.startDate, trip.endDate)}</span>
+          </span>
+        }
+        actions={
+          <>
+            {role === "admin" && <InviteMemberDialog compact />}
+            <AssignTravelersDialog
+              tripId={trip.id}
+              travelers={members.map((m) => ({ userId: m.userId, name: m.name || m.email }))}
+              assignedIds={travelers.map((t) => t.userId)}
             />
-            <HeroStat label="Travelers" value={String(travelers.length)} />
-            {pendingApprovals.length > 0 && (
-              <HeroStat label="Pending approvals" value={String(pendingApprovals.length)} highlight="warn" />
-            )}
-          </div>
-        </article>
+          </>
+        }
+      />
 
-        {/* ── Budget progress ────────────────────────────────────────────── */}
-        {budget > 0 && (
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>
-                Budget · {trip.currency} {approvedSpend.toFixed(0)} approved of {budget.toLocaleString()}
-                {spent > approvedSpend && (
-                  <span className="ml-2 text-amber-600 dark:text-amber-400">
-                    +{trip.currency} {(spent - approvedSpend).toFixed(0)} pending
-                  </span>
-                )}
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="stat">
+          <span className="stat-label"><Wallet className="size-4" /> Approved spend</span>
+          <span className="stat-value">{formatMoney(approvedSpend, trip.currency, { compact: true })}</span>
+          {budget > 0 ? (
+            <>
+              <div className="progress-track mt-1">
+                <div className={`progress-bar ${budgetPct > 100 ? "bg-destructive" : budgetPct > 85 ? "bg-amber-500" : ""}`} style={{ width: `${Math.min(100, budgetPct)}%` }} />
+              </div>
+              <span className="stat-sub">
+                {budgetPct}% of {formatMoney(budget, trip.currency, { compact: true })}
+                {pendingSpend > 0 && ` · +${formatMoney(pendingSpend, trip.currency, { compact: true })} in review`}
               </span>
-              <span className={budgetPct >= 90 ? "font-semibold text-rose-600 dark:text-rose-400" : ""}>{budgetPct}%</span>
-            </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
-              <div
-                className={`h-full rounded-full transition-all ${
-                  budgetPct >= 100 ? "bg-rose-500" : budgetPct >= 80 ? "bg-amber-500" : "bg-primary"
-                }`}
-                style={{ width: `${budgetPct}%` }}
-              />
-            </div>
-          </div>
-        )}
+            </>
+          ) : (
+            <span className="stat-sub">No budget set</span>
+          )}
+        </div>
+        <Stat icon={RouteIcon} label="Route" value={route ? formatDistance(route.distanceMeters) : "—"} sub={route ? `${formatDuration(route.durationSeconds)} · ${itinerary.stops.length} stops` : "Not planned yet"} />
+        <Stat icon={Users} label="Travelers" value={String(travelers.length)} sub={pendingApprovals.length ? `${pendingApprovals.length} awaiting approval` : "All decided"} tone={pendingApprovals.length ? "warning" : undefined} />
+        <Stat icon={Receipt} label="To review" value={String(pendingExpenses.length)} sub={`${reviewable.length} submitted in total`} tone={pendingExpenses.length ? "primary" : undefined} />
+      </div>
 
-        {/* ── Two-column grid ────────────────────────────────────────────── */}
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
+      <section className="mb-6" aria-label="Route planner">
+        <TripPlannerSection
+          trip={{ id: trip.id, name: trip.name, currency: trip.currency, startDate: trip.startDate, endDate: trip.endDate, status: trip.status }}
+          itinerary={itinerary}
+          canEdit
+          canClaimMileage={false}
+        />
+      </section>
 
-          {/* ── Left: Expense review ────────────────────────────────────── */}
-          <article className="card p-0 overflow-hidden">
-            <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-4 pb-0">
-              <h2 className="text-base font-semibold">Expense review</h2>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                {pendingExpenses.length > 0 && (
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-700 dark:bg-amber-400/15 dark:text-amber-300">
-                    {pendingExpenses.length} pending
-                  </span>
-                )}
-                {missingReceipts > 0 && (
-                  <span className="rounded-full bg-rose-100 px-2 py-0.5 font-medium text-rose-700 dark:bg-rose-400/15 dark:text-rose-300">
-                    <ImageOff className="mr-0.5 inline size-3" />{missingReceipts} no receipt
-                  </span>
-                )}
-              </div>
-            </div>
-            <ExpenseTable
-              expenses={reviewableExpenses.map((e) => ({
-                ...e,
-                expenseDate: new Date(e.expenseDate),
-              }))}
-              showTraveler
-              showReview
-              tripId={tripId}
-              defaultTab={pendingExpenses.length > 0 ? "submitted" : "all"}
-              emptyMessage="No submitted expenses on this trip yet."
-              comments={commentsByExpense}
-            />
-          </article>
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_23rem]">
+        <SectionCard title="Expenses" description={pendingExpenses.length ? `${pendingExpenses.length} waiting for a decision` : "Nothing waiting"}>
+          <ExpenseTable
+            expenses={reviewable.map((e) => ({ ...e, expenseDate: new Date(e.expenseDate) }))}
+            showTraveler
+            showReview
+            tripId={tripId}
+            defaultTab={pendingExpenses.length > 0 ? "submitted" : "all"}
+            emptyMessage="No submitted expenses on this trip yet."
+            comments={commentsByExpense}
+          />
+        </SectionCard>
 
-          {/* ── Right column ────────────────────────────────────────────── */}
-          <div className="space-y-5">
-
-            {/* Travel approvals */}
-            <article className="card">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <h2 className="text-base font-semibold">Travel approvals</h2>
-                {pendingApprovals.length > 0 && (
-                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-400/15 dark:text-amber-200">
-                    {pendingApprovals.length} pending
-                  </span>
-                )}
-              </div>
-
-              {approvals.length === 0 ? (
-                <p className="py-4 text-center text-sm text-muted-foreground">
-                  No approval requests yet.
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {[...approvals].sort((a, b) =>
-                    a.status === "requested" ? -1 : b.status === "requested" ? 1 : 0
-                  ).map((approval) => (
-                    <div
-                      key={approval.id}
-                      className={`rounded-lg border p-3 ${
-                        approval.status === "requested"
-                          ? "border-amber-200 bg-amber-50/50 dark:border-amber-400/20 dark:bg-amber-400/5"
-                          : approval.status === "approved"
-                          ? "border-teal-200 bg-teal-50/30 dark:border-teal-400/15 dark:bg-teal-400/5"
-                          : approval.status === "rejected"
-                          ? "border-rose-200 bg-rose-50/30 dark:border-rose-400/15 dark:bg-rose-400/5"
-                          : "border-border bg-secondary/30"
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-bold text-foreground">
-                            {approval.travelerName.slice(0, 1).toUpperCase()}
-                          </span>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold">{approval.travelerName}</p>
-                            {approval.decidedAt && (
-                              <p className="text-xs text-muted-foreground">
-                                {approval.status === "approved" ? "Approved" : "Decided"} {fmt(approval.decidedAt)}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <StatusBadge value={approval.status} />
-                      </div>
-
-                      {approval.purpose && (
-                        <p className="mt-2 text-xs font-medium text-foreground/80">{approval.purpose}</p>
-                      )}
-                      {approval.notes && (
-                        <p className="mt-1 text-xs leading-5 text-muted-foreground">{approval.notes}</p>
-                      )}
-                      <p className="mt-1.5 text-[0.65rem] text-muted-foreground/60">
-                        Requested {fmt(approval.createdAt)}
-                      </p>
-
-                      {approval.status === "requested" && (
-                        <div className="mt-2.5 border-t border-border/50 pt-2.5">
-                          <ReviewApprovalButtons approvalId={approval.id} />
-                        </div>
-                      )}
-
-                      {approval.status === "approved" && (
-                        <div className="mt-2 flex items-center gap-1.5 text-xs font-medium text-teal-600 dark:text-teal-400">
-                          <CheckCircle2 className="size-3.5" /> Approved for this trip
-                        </div>
-                      )}
-                      {approval.status === "rejected" && (
-                        <div className="mt-2 flex items-center gap-1.5 text-xs font-medium text-rose-600 dark:text-rose-400">
-                          <XCircle className="size-3.5" /> Request rejected
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </article>
-
-            {/* Assigned travelers */}
-            <article className="card">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-base font-semibold">Travelers</h2>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {travelers.length} assigned
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {role === "admin" && <InviteMemberDialog compact />}
-                  <AssignTravelersDialog
-                    tripId={trip.id}
-                    travelers={members.filter((m) => m.role === "traveler")}
-                    assignedIds={assignedUserIds}
-                  />
-                </div>
-              </div>
-              <div className="space-y-1.5">
+        <div className="space-y-5">
+          <SectionCard title="Travelers & approvals" description={`${travelers.length} assigned`}>
+            {travelers.length === 0 ? (
+              <p className="px-5 py-6 text-sm text-muted-foreground">No one is assigned yet. Use “Assign travelers” above.</p>
+            ) : (
+              <ul className="divide-list">
                 {travelers.map((t) => {
-                  const approval = approvals.find((ap) => ap.userId === t.userId);
+                  const approval = approvals.find((a) => a.userId === t.userId);
                   return (
-                    <div
-                      key={t.id}
-                      className="flex items-center gap-2.5 rounded-lg border border-border/60 bg-secondary/30 p-2"
-                    >
-                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
-                        {t.name.slice(0, 1).toUpperCase()}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold">{t.name}</span>
-                        <span className="block truncate text-xs text-muted-foreground">{t.email}</span>
-                      </span>
-                      {approval && <StatusBadge value={approval.status} />}
-                    </div>
+                    <li key={t.id} className="px-5 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <span className="avatar">{t.name[0]?.toUpperCase()}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium">{t.name}</span>
+                          <span className="block truncate text-xs text-muted-foreground">{t.email}</span>
+                        </span>
+                        {approval ? (
+                          <StatusBadge value={approval.status} />
+                        ) : (
+                          <span className="text-xs text-subtle">No request</span>
+                        )}
+                      </div>
+                      {approval?.purpose && <p className="mt-2 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">{approval.purpose}</p>}
+                      {approval?.status === "requested" && (
+                        <div className="mt-2.5"><ReviewApprovalButtons approvalId={approval.id} /></div>
+                      )}
+                      {approval?.status === "approved" && approval.decidedAt && (
+                        <p className="mt-1.5 flex items-center gap-1 text-xs text-teal-700 dark:text-teal-300"><CheckCircle2 className="size-3.5" /> Approved {fmt(approval.decidedAt)}</p>
+                      )}
+                      {approval?.status === "rejected" && (
+                        <p className="mt-1.5 flex items-center gap-1 text-xs text-destructive"><XCircle className="size-3.5" /> Declined</p>
+                      )}
+                    </li>
                   );
                 })}
-                {travelers.length === 0 && (
-                  <p className="py-3 text-center text-sm text-muted-foreground">
-                    No travelers assigned yet.
-                  </p>
-                )}
-              </div>
-            </article>
-
-            {/* Reimbursement summary */}
-            {reimbursementRows.length > 0 && (
-              <article className="card">
-                <h2 className="mb-3 text-base font-semibold">Reimbursement summary</h2>
-                <div className="space-y-2">
-                  {reimbursementRows.map((row) => {
-                    const pending = row.total - row.reimbursed;
-                    const done = pending < 0.01;
-                    return (
-                      <div key={row.name} className="flex items-center gap-2.5 rounded-lg border border-border/60 bg-secondary/30 p-2">
-                        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
-                          {row.name.slice(0, 1).toUpperCase()}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-semibold">{row.name}</span>
-                          <span className="block text-xs text-muted-foreground">
-                            {row.currency} {row.total.toFixed(2)} total
-                            {row.reimbursed > 0 && ` · ${row.currency} ${row.reimbursed.toFixed(2)} reimbursed`}
-                          </span>
-                        </span>
-                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${
-                          done
-                            ? "bg-teal-100 text-teal-700 dark:bg-teal-400/15 dark:text-teal-300"
-                            : "bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300"
-                        }`}>
-                          {done ? "Done" : `${row.currency} ${pending.toFixed(2)} due`}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </article>
+              </ul>
             )}
+          </SectionCard>
 
-            {/* Trip info */}
-            <article className="card">
-              <h2 className="mb-3 text-base font-semibold">Trip info</h2>
-              <dl className="space-y-2 text-sm">
-                <InfoRow label="Status" value={<StatusBadge value={trip.status} />} />
-                <InfoRow label="Group" value={tripTeam?.name ?? "—"} />
-                <InfoRow label="Currency" value={trip.currency} />
-                <InfoRow label="Budget" value={`${trip.currency} ${budget.toLocaleString()}`} />
-                <InfoRow label="Starts" value={fmt(trip.startDate)} />
-                <InfoRow label="Ends" value={fmt(trip.endDate)} />
-              </dl>
-            </article>
-          </div>
+          {Object.keys(owed).length > 0 && (
+            <SectionCard title="Reimbursement">
+              <ul className="divide-list">
+                {Object.entries(owed).map(([key, row]) => {
+                  const due = row.total - row.paid;
+                  return (
+                    <li key={key} className="list-row">
+                      <span className="avatar">{row.name[0]?.toUpperCase()}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">{row.name}</span>
+                        <span className="block text-xs text-muted-foreground">{formatMoney(row.total, row.currency)} approved</span>
+                      </span>
+                      {due < 0.01 ? (
+                        <StatusBadge value="reimbursed" label="Paid" />
+                      ) : (
+                        <span className="text-sm font-semibold tabular-nums text-amber-700 dark:text-amber-300">{formatMoney(due, row.currency)} due</span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </SectionCard>
+          )}
         </div>
       </div>
     </AppShell>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="font-medium text-right">{value}</dd>
-    </div>
   );
 }
