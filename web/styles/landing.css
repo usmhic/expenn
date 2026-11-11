@@ -1,0 +1,284 @@
+/* Marketing site (app/(home)) styles. Keep app-wide primitives in components.css. */
+@layer components {
+  /* ── Tokens local to the marketing site ─────────────────────────────────── */
+  .lp {
+    --lp-map-land: oklch(0.968 0.006 250);
+    --lp-map-block: oklch(0.945 0.008 255);
+    --lp-map-water: oklch(0.875 0.045 232);
+    --lp-map-park: oklch(0.925 0.05 155);
+    --lp-map-road: oklch(1 0 0);
+    --lp-map-road-edge: oklch(0.89 0.01 260);
+    --lp-map-major: oklch(0.95 0.06 88);
+    --lp-map-major-edge: oklch(0.86 0.06 80);
+    --lp-band: oklch(0.2 0.045 268);
+    --lp-band-card: oklch(0.245 0.045 268);
+    --lp-band-border: oklch(1 0 0 / 10%);
+    --lp-band-fg: oklch(0.96 0.008 264);
+    --lp-band-muted: oklch(0.78 0.025 266);
+    --lp-warn: oklch(0.66 0.15 65);
+    --lp-danger: oklch(0.58 0.2 25);
+  }
+
+  .dark .lp {
+    --lp-map-land: oklch(0.215 0.018 266);
+    --lp-map-block: oklch(0.235 0.018 266);
+    --lp-map-water: oklch(0.285 0.05 240);
+    --lp-map-park: oklch(0.27 0.045 165);
+    --lp-map-road: oklch(0.31 0.016 266);
+    --lp-map-road-edge: oklch(0.255 0.016 266);
+    --lp-map-major: oklch(0.38 0.03 80);
+    --lp-map-major-edge: oklch(0.3 0.02 80);
+    --lp-band: oklch(0.195 0.03 266);
+    --lp-band-card: oklch(0.23 0.03 266);
+    --lp-warn: oklch(0.8 0.13 75);
+    --lp-danger: oklch(0.72 0.16 25);
+  }
+
+  .lp-container {
+    margin-inline: auto;
+    width: 100%;
+    max-width: 76rem;
+    padding-inline: 1rem;
+  }
+
+  @media (min-width: 640px) {
+    .lp-container {
+      padding-inline: 1.5rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .lp-container {
+      padding-inline: 2rem;
+    }
+  }
+
+  /* ── Type ───────────────────────────────────────────────────────────────── */
+  .lp-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--primary);
+  }
+
+  .lp-h2 {
+    font-family: var(--font-display);
+    font-size: clamp(1.875rem, 1.35rem + 2.2vw, 3.25rem);
+    font-weight: 600;
+    line-height: 1.06;
+    letter-spacing: -0.035em;
+    color: var(--ink);
+    text-wrap: balance;
+  }
+
+  .lp-lead {
+    font-size: 1.0625rem;
+    line-height: 1.65;
+    color: var(--muted-foreground);
+    text-wrap: pretty;
+  }
+
+  @media (min-width: 640px) {
+    .lp-lead {
+      font-size: 1.125rem;
+    }
+  }
+
+  /* ── Surfaces ───────────────────────────────────────────────────────────── */
+  .lp-stage {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius) + 14px);
+    background:
+      radial-gradient(70% 60% at 100% 0%, color-mix(in oklab, var(--mint) 14%, transparent), transparent 70%),
+      radial-gradient(70% 70% at 0% 100%, color-mix(in oklab, var(--primary) 12%, transparent), transparent 70%),
+      color-mix(in oklab, var(--muted) 70%, var(--card));
+  }
+
+  .lp-stage::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-image:
+      linear-gradient(to right, color-mix(in oklab, var(--foreground) 5%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in oklab, var(--foreground) 5%, transparent) 1px, transparent 1px);
+    background-size: 32px 32px;
+    mask-image: radial-gradient(80% 80% at 50% 50%, black, transparent);
+  }
+
+  .lp-window {
+    overflow: hidden;
+    border: 1px solid var(--border-strong);
+    border-radius: calc(var(--radius) + 6px);
+    background: var(--card);
+    box-shadow: var(--shadow-lift);
+  }
+
+  .lp-band {
+    background:
+      radial-gradient(50% 70% at 100% 0%, oklch(0.74 0.135 176 / 0.16), transparent 70%),
+      radial-gradient(60% 80% at 0% 100%, oklch(0.55 0.215 266 / 0.3), transparent 70%),
+      var(--lp-band);
+    color: var(--lp-band-fg);
+  }
+
+  .lp-code {
+    border: 1px solid var(--lp-band-border);
+    border-radius: calc(var(--radius) + 6px);
+    background: oklch(0.14 0.025 266);
+    box-shadow: 0 30px 80px -30px oklch(0 0 0 / 0.6);
+  }
+
+  .lp-gradient-ring {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .lp-gradient-ring::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    padding: 1px;
+    border-radius: inherit;
+    background: linear-gradient(135deg, color-mix(in oklab, var(--primary) 60%, transparent), transparent 45%, color-mix(in oklab, var(--mint) 60%, transparent));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+
+  /* ── Hero ───────────────────────────────────────────────────────────────── */
+  .lp-hero-glow {
+    position: absolute;
+    left: 50%;
+    top: 34%;
+    z-index: -1;
+    height: 60%;
+    width: min(70rem, 120%);
+    translate: -50% 0;
+    border-radius: 999px;
+    background: radial-gradient(closest-side, color-mix(in oklab, var(--primary) 22%, transparent), transparent);
+    filter: blur(40px);
+  }
+
+  .lp-rise {
+    animation: lp-rise 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+
+  .lp-rise-1 {
+    animation-delay: 60ms;
+  }
+
+  .lp-rise-2 {
+    animation-delay: 120ms;
+  }
+
+  .lp-rise-3 {
+    animation-delay: 200ms;
+  }
+
+  .lp-rise-4 {
+    animation-delay: 320ms;
+  }
+
+  @keyframes lp-rise {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .lp-float {
+    animation: lp-float 7s ease-in-out infinite;
+  }
+
+  .lp-float-delayed {
+    animation: lp-float 7s ease-in-out 1.6s infinite;
+  }
+
+  @keyframes lp-float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+
+  /* ── Map illustration ───────────────────────────────────────────────────── */
+  .lp-map-svg {
+    display: block;
+    height: 100%;
+    width: 100%;
+  }
+
+  .lp-route-line {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: lp-draw 2.2s cubic-bezier(0.6, 0, 0.3, 1) 0.5s forwards;
+  }
+
+  @keyframes lp-draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  .lp-pulse {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: lp-pulse 2.4s ease-out infinite;
+  }
+
+  @keyframes lp-pulse {
+    0% {
+      opacity: 0.55;
+      transform: scale(0.6);
+    }
+    100% {
+      opacity: 0;
+      transform: scale(1.9);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .lp-route-line {
+      stroke-dashoffset: 0;
+    }
+
+    .lp-pulse {
+      display: none;
+    }
+  }
+
+  /* ── FAQ ────────────────────────────────────────────────────────────────── */
+  .lp-faq summary {
+    list-style: none;
+  }
+
+  .lp-faq summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .lp-faq[open] .lp-faq-icon {
+    transform: rotate(45deg);
+  }
+
+  /* ── Header ─────────────────────────────────────────────────────────────── */
+  .lp-header {
+    background: color-mix(in oklab, var(--canvas) 78%, transparent);
+    backdrop-filter: blur(18px) saturate(160%);
+    -webkit-backdrop-filter: blur(18px) saturate(160%);
+  }
+}
