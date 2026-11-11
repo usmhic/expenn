@@ -51,15 +51,15 @@ export default async function OnboardingPage({
   const travelerRoot = membership ? `/${membership.slug}/traveler` : null;
 
   return (
-    <main className="min-h-dvh bg-background">
+    <main className="min-h-dvh bg-hero">
       {/* Top bar */}
-      <div className="border-b border-border bg-background/80 backdrop-blur-sm">
+      <div className="border-b border-border bg-canvas/70 backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-          <Wordmark iconClassName="brand-icon-mark size-8" textClassName="text-lg" />
+          <Wordmark />
           <div className="flex items-center gap-2">
             <ThemeToggle />
             {homeHref && (
-              <Link href={homeHref} className="secondary-button rounded-lg text-sm">
+              <Link href={homeHref} className="secondary-button">
                 Dashboard
               </Link>
             )}
@@ -71,7 +71,7 @@ export default async function OnboardingPage({
         {/* Header */}
         <div className="mb-8">
           <p className="text-sm font-semibold text-primary">Workspace setup</p>
-          <h1 className="mt-1.5 text-3xl font-bold">
+          <h1 className="page-title mt-1.5 sm:text-4xl">
             {hasWorkspace ? "Manage workspaces" : "Get started"}
           </h1>
           <p className="mt-2 text-muted-foreground">
@@ -177,7 +177,7 @@ export default async function OnboardingPage({
                         <form action={acceptInvitationAction} className="mt-4">
                           <input type="hidden" name="invitationId" value={inv.id} />
                           <input type="hidden" name="organizationId" value={inv.organizationId} />
-                          <SubmitButton pendingText="Joining…" className="primary-button rounded-lg text-sm">
+                          <SubmitButton pendingText="Joining…" className="primary-button">
                             <Check className="size-3.5" /> Accept &amp; join workspace
                           </SubmitButton>
                         </form>
@@ -233,7 +233,7 @@ export default async function OnboardingPage({
                   <p className="text-sm text-muted-foreground mb-4">
                     Your workspace <strong>{membership?.name}</strong> is ready.
                   </p>
-                  <Link href={homeHref} className="primary-button rounded-lg text-sm">
+                  <Link href={homeHref} className="primary-button">
                     Open dashboard <ArrowRight className="size-3.5" />
                   </Link>
                 </article>

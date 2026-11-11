@@ -111,7 +111,8 @@ export function TripPlanner({
 
   const dirty = signature(stops, profile) !== saved;
   // Routes only make sense with two or more stops; keep the last result until the next one arrives.
-  const visibleRoutes = stops.length >= 2 ? routes : [];
+  const hasRoute = stops.length >= 2;
+  const visibleRoutes = useMemo(() => (hasRoute ? routes : []), [hasRoute, routes]);
   const route = visibleRoutes[selectedRoute];
   const routeSig = routeSignature(stops, profile);
 

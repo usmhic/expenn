@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Camera, Paperclip, Receipt, Undo2 } from "lucide-react";
 import { cookies } from "next/headers";
+import { PageHeader } from "@/components/layout/page";
 import { AppShell, StatusBadge } from "@/components/layout/navigation";
 import {
   CreateExpenseDialog, DeleteExpenseButton, EditExpenseDialog, SubmitDraftsButton, SubmitExpenseButton,
@@ -64,16 +65,17 @@ export default async function TravelerExpensesPage({
           </div>
         )}
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-xl font-bold">Expenses</h1>
-            <p className="mt-0.5 text-sm text-muted-foreground">Log it, submit it, get paid back.</p>
-          </div>
-          <div className="flex gap-2">
-            <Link href="./capture" className="secondary-button rounded-md text-sm"><Camera className="size-4" /> Capture</Link>
-            <CreateExpenseDialog trips={trips} defaultCurrency={lastCurrency} />
-          </div>
-        </div>
+        <PageHeader
+          title="Expenses"
+          description="Log it, submit it, get paid back."
+          actions={
+            <>
+              <Link href="./capture" className="secondary-button"><Camera className="size-4" /> Capture</Link>
+              <CreateExpenseDialog trips={trips} defaultCurrency={lastCurrency} />
+            </>
+          }
+          className="mb-0"
+        />
 
         <div className="grid grid-cols-3 gap-2 sm:gap-3">
           <MoneyTile label="Owed to you" value={formatTotals(pick(summary.byCurrency, "owed"), "—")} accent />

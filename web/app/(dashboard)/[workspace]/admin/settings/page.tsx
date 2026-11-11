@@ -1,5 +1,6 @@
 import { Mail, Shield, Users } from "lucide-react";
 import { cookies } from "next/headers";
+import { PageHeader } from "@/components/layout/page";
 import { AppShell, StatusBadge } from "@/components/layout/navigation";
 import { AddToTeamDialog, CreateTeamDialog, InviteMemberDialog } from "@/components/dialogs";
 import { apiClient } from "@/lib/api-client";
@@ -38,12 +39,7 @@ export default async function AdminSettingsPage({
           </div>
         )}
 
-        <div>
-          <h1 className="text-xl font-bold">Settings</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Members and teams for this workspace.
-          </p>
-        </div>
+        <PageHeader title="People & settings" description="Invite colleagues, set their roles and organise them into teams." className="mb-0" />
 
         {/* ── Members ── */}
         <article className="card">

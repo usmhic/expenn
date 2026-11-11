@@ -8,7 +8,7 @@ import { Spinner } from "@/components/ui/spinner";
 
 function AuthAlert({ message }: { message: string }) {
   return (
-    <div className="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200">
+    <div className="notice notice-danger">
       {message}
     </div>
   );
@@ -54,8 +54,8 @@ export function EmailMagicLinkForm({
 
   if (stage === "code") {
     return (
-      <form onSubmit={handleVerifyOtp} className="space-y-3">
-        <div className="flex items-start gap-3 rounded-xl border border-teal-200 bg-teal-50/80 px-4 py-3 dark:border-teal-400/20 dark:bg-teal-400/10">
+      <form onSubmit={handleVerifyOtp} className="space-y-4">
+        <div className="notice notice-success">
           <Mail className="mt-0.5 size-4 shrink-0 text-teal-600 dark:text-teal-400" />
           <p className="text-sm text-teal-700 dark:text-teal-300">
             We sent a 6-digit code to <strong>{email}</strong>. It expires in 10 minutes.
@@ -64,7 +64,7 @@ export function EmailMagicLinkForm({
 
         {error && <AuthAlert message={error} />}
 
-        <label className="block text-sm font-semibold">
+        <label className="field">
           Verification code
           <input
             ref={codeRef}
@@ -74,14 +74,14 @@ export function EmailMagicLinkForm({
             maxLength={6}
             pattern="[0-9]{6}"
             placeholder="123456"
-            className="form-control mt-1 text-center text-2xl font-mono tracking-widest"
+            className="form-control h-14 text-center font-mono text-2xl tracking-[0.5em]"
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
             disabled={pending}
           />
         </label>
 
-        <button type="submit" className="primary-button w-full" disabled={pending || code.length < 6}>
+        <button type="submit" className="primary-button button-lg w-full" disabled={pending || code.length < 6}>
           {pending ? <><Spinner className="size-4" /> Verifying…</> : <>Verify &amp; sign in <ArrowRight className="size-4" /></>}
         </button>
 
@@ -97,22 +97,22 @@ export function EmailMagicLinkForm({
   }
 
   return (
-    <form onSubmit={handleSendOtp} className="space-y-3">
+    <form onSubmit={handleSendOtp} className="space-y-4">
       {error && <AuthAlert message={error} />}
-      <label className="block text-sm font-semibold">
+      <label className="field">
         Email address
         <input
           type="email"
           required
           autoComplete="email"
           placeholder="you@company.com"
-          className="form-control mt-1 font-normal"
+          className="form-control h-11"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           disabled={pending}
         />
       </label>
-      <button type="submit" className="primary-button w-full" disabled={pending}>
+      <button type="submit" className="primary-button button-lg w-full" disabled={pending}>
         {pending ? <><Spinner className="size-4" /> Sending code…</> : <>Continue with email <ArrowRight className="size-4" /></>}
       </button>
     </form>
@@ -139,35 +139,35 @@ export function ADSignInForm({ callbackURL = "/onboarding" }: { callbackURL?: st
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
+    <form onSubmit={handleSubmit} className="space-y-4">
       {error && <AuthAlert message={error} />}
-      <label className="block text-sm font-semibold">
+      <label className="field">
         Username (DOMAIN\user or UPN)
         <input
           type="text"
           required
           autoComplete="username"
           placeholder="CORP\username or user@corp.com"
-          className="form-control mt-1 font-normal font-mono"
+          className="form-control h-11 font-mono"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           disabled={pending}
         />
       </label>
-      <label className="block text-sm font-semibold">
+      <label className="field">
         Password
         <input
           type="password"
           required
           autoComplete="current-password"
           placeholder="••••••••"
-          className="form-control mt-1 font-normal"
+          className="form-control h-11"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           disabled={pending}
         />
       </label>
-      <button type="submit" className="primary-button w-full" disabled={pending}>
+      <button type="submit" className="primary-button button-lg w-full" disabled={pending}>
         {pending
           ? <><Spinner className="size-4" /> Authenticating…</>
           : <><KeyRound className="size-4" /> Sign in with Active Directory</>}
@@ -196,35 +196,35 @@ export function PasswordSignInForm({ callbackURL = "/onboarding" }: { callbackUR
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
+    <form onSubmit={handleSubmit} className="space-y-4">
       {error && <AuthAlert message={error} />}
-      <label className="block text-sm font-semibold">
+      <label className="field">
         Email
         <input
           type="email"
           required
           autoComplete="email"
           placeholder="you@company.com"
-          className="form-control mt-1 font-normal"
+          className="form-control h-11"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           disabled={pending}
         />
       </label>
-      <label className="block text-sm font-semibold">
+      <label className="field">
         Password
         <input
           type="password"
           required
           autoComplete="current-password"
           placeholder="••••••••"
-          className="form-control mt-1 font-normal"
+          className="form-control h-11"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           disabled={pending}
         />
       </label>
-      <button type="submit" className="primary-button w-full" disabled={pending}>
+      <button type="submit" className="primary-button button-lg w-full" disabled={pending}>
         {pending ? <><Spinner className="size-4" /> Signing in…</> : <>Sign in <ArrowRight className="size-4" /></>}
       </button>
     </form>
