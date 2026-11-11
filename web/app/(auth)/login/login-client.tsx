@@ -34,7 +34,7 @@ export function LoginClient({ callbackURL, oidcEnabled, oidcProviderName, initia
     { id: "password", label: "Password", icon: <KeyRound className="size-3.5" /> },
     // Show AD tab for on-premises LDAP; when OIDC is enabled, SSO button handles it
     ...(!oidcEnabled
-      ? [{ id: "ad" as Tab, label: "Active Directory", icon: <Building2 className="size-3.5" /> }]
+      ? [{ id: "ad" as Tab, label: "Directory", icon: <Building2 className="size-3.5" /> }]
       : []),
   ];
 

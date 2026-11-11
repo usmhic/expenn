@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Trip planning on a map.** Every trip has an itinerary beside an interactive MapLibre map:
+  - add stops by place search or by clicking the map, then drag to reorder them
+  - choose car, van/truck, bike or walking, and compare alternative routes
+  - optimise the visiting order
+  - see distance and travel time per leg
+  - give each stop a type, dates and notes, then save
+  Routing, place search and stop optimisation use OpenRouteService through new API endpoints: `/api/places/*`, `/api/routing/*` and `/api/trips/{id}/itinerary`. Stops are stored in `travel.trip_stops` (migration `AddTripItinerary`).
+- "Claim mileage" turns a driven route into a prefilled mileage expense.
+- New trips pages for travelers and admins, with route thumbnails, and an admin **Overview** dashboard.
+- Personal workspaces can create their own trips.
+- Documents can be linked to a trip, and expiring passports and visas are flagged.
+- `OpenRouteService__ApiKey` / `OpenRouteService__BaseUrl` (API) and `NEXT_PUBLIC_MAP_STYLE_URL` / `NEXT_PUBLIC_MAP_STYLE_URL_DARK` (web) settings.
+
 - **Review & pay** page for admins and managers: tabs for to review, to pay, paid, and
   sent back; bulk approve, send back, and mark paid; one-click selection of expenses
   without issues; CSV export for payroll and accounting imports.
@@ -38,6 +51,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Complete redesign of the web app and marketing site.** It has a new design system: tokens, self-hosted Inter and Bricolage Grotesque fonts, light and dark themes. The app shell is new:
+  - grouped sidebar, collapsible on desktop
+  - sticky top bar with ⌘K search
+  - actionable notifications
+  - phone tab bar with a capture button
+  All pages are rebuilt on shared page, card, stat and list components and work from 360px phones to wide screens.
+- The sign-in page is a split layout with a product panel.
+- Loading states mirror the new layout.
+
 - One receipt-first expense form for Add, Edit, and Capture, with standard categories,
   today's date, the active trip and its currency preselected, and company-card spend
   marked as not reimbursable.
@@ -61,6 +83,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with the usmhic open-source ecosystem.
 
 ### Fixed
+
+- The sign-in page crashed: the server called a client-only helper for SSO information.
+- The theme toggle caused hydration mismatches in dark mode.
+- Trip creation accepted traveler IDs that weren't members of the workspace.
 
 - The API read the `sub` and `role` claims by their raw names while the JWT handler
   renamed them, so user-scoped requests (creating a workspace, listing your expenses)

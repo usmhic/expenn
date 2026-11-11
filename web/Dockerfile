@@ -19,12 +19,18 @@ FROM base AS builder
 ARG APP_URL=http://localhost:3000
 # hadolint ignore=DL3044
 ARG NEXT_PUBLIC_DOTNET_API_URL=http://localhost:5000
+# hadolint ignore=DL3044
+ARG NEXT_PUBLIC_MAP_STYLE_URL=https://tiles.openfreemap.org/styles/liberty
+# hadolint ignore=DL3044
+ARG NEXT_PUBLIC_MAP_STYLE_URL_DARK=https://tiles.openfreemap.org/styles/dark
 
 # NEXT_PUBLIC_APP_URL is used in client-side links.
 # NEXT_PUBLIC_DOTNET_API_URL is used in client components that call the .NET API.
 # hadolint ignore=DL3044
 ENV NEXT_PUBLIC_APP_URL=$APP_URL \
-    NEXT_PUBLIC_DOTNET_API_URL=$NEXT_PUBLIC_DOTNET_API_URL
+    NEXT_PUBLIC_DOTNET_API_URL=$NEXT_PUBLIC_DOTNET_API_URL \
+    NEXT_PUBLIC_MAP_STYLE_URL=$NEXT_PUBLIC_MAP_STYLE_URL \
+    NEXT_PUBLIC_MAP_STYLE_URL_DARK=$NEXT_PUBLIC_MAP_STYLE_URL_DARK
 
 COPY --link --from=deps /app/node_modules ./node_modules
 COPY --link . .

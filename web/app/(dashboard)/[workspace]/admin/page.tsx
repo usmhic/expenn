@@ -65,7 +65,7 @@ export default async function AdminOverviewPage({ params }: { params: Promise<{ 
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
-        <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
           <SectionCard
             title="Expenses to review"
             description={oldestReview[0] ? `Oldest submitted ${new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(oldestReview[0].submittedAt ?? oldestReview[0].createdAt))}` : undefined}

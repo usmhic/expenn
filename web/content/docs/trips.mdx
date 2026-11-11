@@ -1,53 +1,81 @@
 ---
-title: Trips
-description: Creating trips, assigning travelers, tracking progress and spend
+title: Trips & route planning
+description: Create trips, plan multi-stop routes on the map, assign travelers and track spend
 ---
 
-A **trip** is the container for a travel event — it has a destination, date range, currency, and optional budget. Expenses are attached to trips, which is how spend gets tracked and reported.
+A **trip** brings everything about a journey together: dates, budget and currency, who's travelling, the approval, the route and every expense logged against it.
 
 ## Creating a trip
 
-Go to **Trips → New trip**. You'll need:
+Choose **Trips → New trip** and fill in:
 
-- **Name** — e.g. "Q3 Sales Summit – Berlin"
-- **Destination** — city or country
-- **Start & end dates**
-- **Currency** — the primary currency for expenses on this trip
-- **Budget** (optional) — enables the budget-vs-actual progress bar
+- **Trip name** — e.g. "Berlin client summit"
+- **Main destination** — city or region
+- **Start and end dates**
+- **Budget** (optional) and **currency** — the budget bar on the trip page counts expenses in this currency
+- **Team** and **who's travelling** (company workspaces)
 
-Trips can only be created by **Admins**, **Managers** (for their team), and **Owners**.
+When you select **Create and plan route**, the trip opens on its map so you can add stops right away.
+
+Who can create trips:
+
+| Workspace | Who |
+|---|---|
+| Company | Owners, admins, and managers (for their own teams) |
+| Personal | You — you're added to every trip you create |
+
+## Planning the route
+
+Every trip page has an **itinerary** next to an interactive map.
+
+1. **Add stops.** Type a city, address or venue into **Add a stop**, or click anywhere on the map and select **Add**.
+2. **Order them.** Drag stops by the handle to reorder them. With four or more stops, **Optimise order** finds the shortest visiting order. It keeps your first and last stops fixed.
+3. **Choose how you travel.** Pick car, van/truck, bike or walking above the stop list. The route redraws, with the distance and travel time for each leg.
+4. **Compare routes.** With exactly two stops you may get alternatives. Select one in the route chips or click its dashed line on the map.
+5. **Add details.** Open a stop to set its type (stop, overnight stay, meeting, transit), arrival and departure dates, and notes such as a booking reference.
+6. **Save the itinerary.** Everyone on the trip sees the saved route. Trip cards across the app show a thumbnail of it, the stops, and the total distance.
+
+Travelers assigned to the trip, managers of its team, and admins can edit the itinerary.
+
+### Claiming mileage
+
+When the route is driven, travelers can select **Claim mileage** under the route total. This opens a prefilled expense: the merchant reads "Mileage: start → end", the category is Mileage, and the notes record the distance. Enter the amount using your organisation's mileage rate, then submit as usual.
+
+<Callout type="info">
+  Place search and routing are powered by [openrouteservice](https://openrouteservice.org), and the maps use OpenStreetMap data.
+  If your administrator hasn't set this up, you can still pin stops by clicking the map. Distances and routes won't be calculated until it's configured.
+</Callout>
 
 ## Trip statuses
 
 | Status | Meaning |
 |---|---|
-| `draft` | Created but not started — travelers can be assigned |
-| `active` | In progress — travelers are on the road |
+| `draft` | Being set up — not yet visible as an active trip |
+| `active` | Planned or in progress |
 | `completed` | Trip ended — expenses can still be submitted |
 | `archived` | Closed — read-only |
 
-Admins and managers move trips between statuses from the trip detail page. Travelers cannot change trip status.
+## Travel approval
 
-## Assigning travelers
+In company workspaces, travelers select **Request approval** on the trip page and add a short purpose. Admins and managers see the request in three places:
 
-From the trip detail page, use **Assign travelers** to add workspace members to a trip. Assigned travelers see the trip in their mobile home screen and can attach expenses to it.
+- **Overview**
+- the top of **Trips**
+- the trip's **Travelers & approvals** panel
 
-<Callout type="info">
-  Personal-account users don't have an "assign travelers" step — all trips
-  belong to themselves automatically.
-</Callout>
+From any of these they can approve or decline it. Several requests can be approved at once from the **Trips** page.
 
-## Trip progress
+## Budget and spend
 
-The trip detail card shows:
-- **Date progress** — how far through the travel window you are (as a percentage)
-- **Budget vs. actual** — total approved expenses against the trip budget (if set)
-- **Pending expenses** — expenses awaiting review
+The trip page shows:
 
-## Approvals on trips
+- **Spent / approved spend** against the budget, with the amount still in review
+- **Route** distance and travel time
+- **Expenses** on the trip, with their status
+- **Reimbursement** — what's approved and still due to each traveler (admins)
 
-Once a traveler submits expenses for a trip, they appear in the **Expenses → Review queue**. Approving or rejecting expenses from that queue automatically updates the trip's spend total.
+## Setting up routing (administrators)
 
-## Trips in the mobile app
+Routing and place search need an [openrouteservice API key](https://openrouteservice.org/dev/#/signup). The free plan is enough for most teams. Set `OpenRouteService__ApiKey` for the API and restart it. To use a self-hosted openrouteservice instance, also set `OpenRouteService__BaseUrl`.
 
-The traveler's **Home** tab always surfaces the active trip in the hero card. The **Trips** tab shows all trips with search and status filters — tap any trip to see its full details, expense breakdown, and timeline.
+Map tiles come from [OpenFreeMap](https://openfreemap.org) by default. To use your own MapLibre style, set `NEXT_PUBLIC_MAP_STYLE_URL` and `NEXT_PUBLIC_MAP_STYLE_URL_DARK` when building the web app.

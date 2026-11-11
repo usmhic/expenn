@@ -3,18 +3,20 @@
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 
+/** Icons switch with CSS (the `dark` class), so server and client markup always match. */
 export function ThemeToggle({ className = "" }: { className?: string }) {
   const { resolvedTheme, setTheme } = useTheme();
-  const isDark = resolvedTheme === "dark";
 
   return (
     <button
       type="button"
       className={`icon-button ${className}`}
-      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      onClick={() => setTheme(isDark ? "light" : "dark")}
+      aria-label="Toggle dark mode"
+      title="Toggle dark mode"
+      onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
     >
-      {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
+      <Moon className="size-4 dark:hidden" />
+      <Sun className="hidden size-4 dark:block" />
     </button>
   );
 }

@@ -877,25 +877,28 @@ export function ReviewExpenseButtons({
           <button
             type="button"
             onClick={() => setOpen("approved")}
+            aria-label="Approve"
             className="secondary-button button-sm text-teal-700 dark:text-teal-400"
           >
-            <Check className="size-3.5" /> Approve
+            <Check className="size-3.5" /> <span className="hidden sm:inline">Approve</span>
           </button>
           <button
             type="button"
             onClick={() => setOpen("rejected")}
+            aria-label="Send back"
             className="secondary-button button-sm text-rose-600 dark:text-rose-400"
           >
-            <X className="size-3.5" /> Send back
+            <X className="size-3.5" /> <span className="hidden sm:inline">Send back</span>
           </button>
         </>
       ) : (
         <button
           type="button"
           onClick={() => setOpen("reimbursed")}
+          aria-label="Mark paid"
           className="secondary-button button-sm text-emerald-700 dark:text-emerald-400"
         >
-          <Banknote className="size-3.5" /> Mark paid
+          <Banknote className="size-3.5" /> <span className="hidden sm:inline">Mark paid</span>
         </button>
       )}
 

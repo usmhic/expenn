@@ -233,6 +233,7 @@
   /* ── Surfaces ──────────────────────────────────────────────────────────── */
 
   .card {
+    min-width: 0;
     border: 1px solid var(--border);
     border-radius: var(--radius-xl);
     background: var(--card);
@@ -659,6 +660,7 @@
   /* ── Stats ─────────────────────────────────────────────────────────────── */
 
   .stat {
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
@@ -1003,87 +1005,88 @@
     opacity: 0.3;
     pointer-events: none;
   }
+}
 
-  /* ── Maps (MapLibre) ───────────────────────────────────────────────────── */
+/* Map styles stay outside the cascade layer: maplibre-gl.css is unlayered and would otherwise win. */
+/* ── Maps (MapLibre) ───────────────────────────────────────────────────── */
 
-  .map-frame {
-    position: relative;
-    isolation: isolate;
-    overflow: hidden;
-    border-radius: var(--radius-xl);
-    background:
-      radial-gradient(circle at 30% 20%, color-mix(in oklab, var(--primary) 6%, transparent), transparent 60%),
-      var(--muted);
-  }
+.map-frame {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(circle at 30% 20%, color-mix(in oklab, var(--primary) 6%, transparent), transparent 60%),
+    var(--muted);
+}
 
-  .map-frame .maplibregl-ctrl-attrib {
-    font-size: 0.6875rem;
-    background: color-mix(in oklab, var(--card) 80%, transparent);
-  }
+.map-frame .maplibregl-ctrl-attrib {
+  font-size: 0.6875rem;
+  background: color-mix(in oklab, var(--card) 80%, transparent);
+}
 
-  .map-frame .maplibregl-ctrl-group {
-    border-radius: calc(var(--radius) - 2px);
-    box-shadow: var(--shadow-soft);
-    background: var(--card);
-  }
+.map-frame .maplibregl-ctrl-group {
+  border-radius: calc(var(--radius) - 2px);
+  box-shadow: var(--shadow-soft);
+  background: var(--card);
+}
 
-  .map-frame .maplibregl-ctrl-group button + button {
-    border-top-color: var(--border);
-  }
+.map-frame .maplibregl-ctrl-group button + button {
+  border-top-color: var(--border);
+}
 
-  .dark .map-frame .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
-    filter: invert(1);
-  }
+.dark .map-frame .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+  filter: invert(1);
+}
 
-  .map-marker {
-    display: flex;
-    height: 2.5rem;
-    width: 2.25rem;
-    align-items: flex-start;
-    justify-content: center;
-    cursor: pointer;
-    background: none;
-  }
+.map-marker {
+  display: flex;
+  height: 2.5rem;
+  width: 2.25rem;
+  align-items: flex-start;
+  justify-content: center;
+  cursor: pointer;
+  background: none;
+}
 
-  .map-pin {
-    display: flex;
-    height: 1.875rem;
-    width: 1.875rem;
-    align-items: center;
-    justify-content: center;
-    border-radius: 999px 999px 999px 0.25rem;
-    transform: rotate(-45deg);
-    background: var(--primary);
-    color: var(--primary-foreground);
-    box-shadow: 0 0 0 3px var(--map-casing), var(--shadow-lift);
-    cursor: pointer;
-    transition: transform 150ms ease;
-  }
+.map-pin {
+  display: flex;
+  height: 1.875rem;
+  width: 1.875rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px 999px 999px 0.25rem;
+  transform: rotate(-45deg);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 0 0 3px var(--map-casing), var(--shadow-lift);
+  cursor: pointer;
+  transition: transform 150ms ease;
+}
 
-  .map-pin > span {
-    transform: rotate(45deg);
-    font-size: 0.75rem;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-  }
+.map-pin > span {
+  transform: rotate(45deg);
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
 
-  .map-pin[data-kind="stay"] {
-    background: oklch(0.6 0.16 176);
-  }
+.map-pin[data-kind="stay"] {
+  background: oklch(0.6 0.16 176);
+}
 
-  .map-pin[data-kind="meeting"] {
-    background: oklch(0.66 0.17 50);
-  }
+.map-pin[data-kind="meeting"] {
+  background: oklch(0.66 0.17 50);
+}
 
-  .map-pin[data-active="true"] {
-    transform: rotate(-45deg) scale(1.18);
-  }
+.map-pin[data-active="true"] {
+  transform: rotate(-45deg) scale(1.18);
+}
 
-  .map-pin-draft {
-    height: 0.875rem;
-    width: 0.875rem;
-    border-radius: 999px;
-    background: var(--card);
-    box-shadow: 0 0 0 3px var(--primary), var(--shadow-lift);
-  }
+.map-pin-draft {
+  height: 0.875rem;
+  width: 0.875rem;
+  border-radius: 999px;
+  background: var(--card);
+  box-shadow: 0 0 0 3px var(--primary), var(--shadow-lift);
 }
