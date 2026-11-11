@@ -577,6 +577,7 @@
 
   .segmented-item[aria-current="page"],
   .segmented-item[aria-pressed="true"],
+  .segmented-item[aria-checked="true"],
   .segmented-item[data-active="true"] {
     background: var(--card);
     color: var(--foreground);
@@ -648,6 +649,7 @@
   }
 
   .chip-button[aria-pressed="true"],
+  .chip-button[aria-checked="true"],
   .chip-button[aria-current="page"] {
     border-color: color-mix(in oklab, var(--primary) 45%, transparent);
     background: var(--accent);

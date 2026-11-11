@@ -23,24 +23,32 @@ async function wsPath(role: "admin" | "traveler", path = "") {
   return `/${state.workspaceSlug}/${role}${path}`;
 }
 
-export type DialogState = { success?: boolean; error?: string; message?: string } | null;
+export type DialogState = { success?: boolean; error?: string; message?: string; id?: string } | null;
 
 export async function createTripDialogAction(_: DialogState, formData: FormData): Promise<DialogState> {
   try {
     const input = z.object({
-      teamId: z.string().min(1),
-      name: z.string().min(2),
-      destination: z.string().min(2),
-      budget: z.coerce.number().positive(),
-      currency: z.string().min(3).max(5),
-      startDate: z.string().date(),
-      endDate: z.string().date(),
+      teamId: z.string().optional(),
+      name: z.string().trim().min(2, "Give the trip a name."),
+      destination: z.string().trim().min(2, "Where are you going?"),
+      budget: z.coerce.number().min(0, "Budget can't be negative.").default(0),
+      currency: z.string().trim().min(3).max(5),
+      startDate: z.string().date("Pick a start date."),
+      endDate: z.string().date("Pick an end date."),
       status: z.enum(["draft", "active", "completed", "archived"]).default("active"),
     }).parse(Object.fromEntries(formData.entries()));
+    if (input.endDate < input.startDate) return { error: "The trip can't end before it starts." };
     const travelerUserIds = formData.getAll("travelerUserIds").map(String).filter(Boolean);
-    await (await api()).trips.create({ ...input, travelerUserIds });
+    const trip = await (await api()).trips.create({
+      ...input,
+      teamId: input.teamId ?? "",
+      currency: input.currency.toUpperCase(),
+      travelerUserIds,
+    });
     revalidatePath(await wsPath("admin"));
-    return { success: true };
+    revalidatePath(await wsPath("admin", "/trips"));
+    revalidatePath(await wsPath("traveler", "/trips"));
+    return { success: true, id: trip.id };
   } catch (e) { return { error: errMsg(e) }; }
 }
 

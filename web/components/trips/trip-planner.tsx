@@ -110,15 +110,15 @@ export function TripPlanner({
   const lastRouted = useRef(initial.route ? routeSignature(fromItinerary(initial), initial.profile ?? "driving-car") : "");
 
   const dirty = signature(stops, profile) !== saved;
-  const route = routes[selectedRoute];
+  // Routes only make sense with two or more stops; keep the last result until the next one arrives.
+  const visibleRoutes = stops.length >= 2 ? routes : [];
+  const route = visibleRoutes[selectedRoute];
   const routeSig = routeSignature(stops, profile);
 
   // Re-route whenever stop positions or the travel mode change.
   useEffect(() => {
     if (!routingEnabled) return;
     if (stops.length < 2) {
-      setRoutes([]);
-      setRouteError(null);
       lastRouted.current = routeSig;
       return;
     }
@@ -257,7 +257,7 @@ export function TripPlanner({
     () => stops.map((s) => ({ id: s.key, name: s.name, latitude: s.latitude, longitude: s.longitude, kind: s.kind })),
     [stops],
   );
-  const mapRoutes = useMemo(() => routes.map((r) => ({ coordinates: r.geometry.coordinates })), [routes]);
+  const mapRoutes = useMemo(() => visibleRoutes.map((r) => ({ coordinates: r.geometry.coordinates })), [visibleRoutes]);
   const near = stops.length > 0 ? { lat: stops[stops.length - 1].latitude, lon: stops[stops.length - 1].longitude } : undefined;
 
   return (
@@ -310,7 +310,6 @@ export function TripPlanner({
                       type="button"
                       role="radio"
                       aria-checked={profile === p.value}
-                      aria-pressed={profile === p.value}
                       disabled={!canEdit}
                       onClick={() => setProfile(p.value)}
                       className="segmented-item px-2"
@@ -428,15 +427,14 @@ export function TripPlanner({
               {mileageSlot?.({ distanceMeters: route.distanceMeters, from: stops[0].name, to: stops[stops.length - 1].name, profile })}
             </div>
           )}
-          {routes.length > 1 && (
+          {visibleRoutes.length > 1 && (
             <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Route options">
-              {routes.map((r, index) => (
+              {visibleRoutes.map((r, index) => (
                 <button
                   key={index}
                   type="button"
                   role="radio"
                   aria-checked={selectedRoute === index}
-                  aria-pressed={selectedRoute === index}
                   onClick={() => setSelectedRoute(index)}
                   className="chip chip-button"
                 >
@@ -485,11 +483,7 @@ function PlaceSearch({ near, onPick }: { near?: { lat: number; lon: number }; on
 
   useEffect(() => {
     const q = query.trim();
-    if (q.length < 2) {
-      setResults([]);
-      setError(null);
-      return;
-    }
+    if (q.length < 2) return;
     const timer = setTimeout(async () => {
       setLoading(true);
       try {

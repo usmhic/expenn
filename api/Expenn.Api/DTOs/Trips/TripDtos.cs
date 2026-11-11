@@ -1,7 +1,7 @@
 namespace Expenn.Api.DTOs.Trips;
 
 public record CreateTripRequest(
-    string TeamId,
+    string? TeamId,
     string Name,
     string Destination,
     string StartDate,
