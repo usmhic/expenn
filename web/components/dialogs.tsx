@@ -415,7 +415,7 @@ export function InviteMemberDialog({ compact }: { compact?: boolean } = {}) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {compact ? (
-          <button className="secondary-button rounded-md text-sm">
+          <button className="secondary-button">
             <UserPlus className="size-4" /> Invite
           </button>
         ) : (
@@ -569,7 +569,7 @@ export function AssignTravelersDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button className="secondary-button rounded-md text-sm">
+        <button className="secondary-button">
           <UserPlus className="size-4" /> Edit travelers
         </button>
       </DialogTrigger>
@@ -628,7 +628,7 @@ export function RequestApprovalDialog({ tripId }: { tripId: string }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button className="primary-button rounded-md text-sm">
+        <button className="primary-button">
           <Send className="size-4" /> Request approval
         </button>
       </DialogTrigger>
