@@ -143,7 +143,7 @@ function CaptureVisual() {
             <p className="text-xs font-semibold text-foreground">{m.sentBack}</p>
             <p className="truncate text-[11px] text-muted-foreground">{m.sentBackMeta}</p>
           </div>
-          <span className="secondary-button button-sm !min-h-7 !px-2 text-[11px]">{m.resubmit}</span>
+          <span className="secondary-button button-sm min-h-7! px-2! text-[11px]">{m.resubmit}</span>
         </div>
         <div className="rounded-2xl border border-border bg-card p-4 shadow-soft">
           <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
@@ -190,7 +190,7 @@ function ReviewVisual() {
           <Inbox className="size-4 text-primary" aria-hidden />
           {m.title}
         </p>
-        <span className="secondary-button button-sm !min-h-7 !px-2.5 text-[11px]">
+        <span className="secondary-button button-sm min-h-7! px-2.5! text-[11px]">
           <Download className="size-3.5" aria-hidden />
           {m.export}
         </span>
@@ -214,12 +214,12 @@ function ReviewVisual() {
 
       <div className="m-3 flex flex-wrap items-center gap-2 rounded-lg bg-accent/70 px-3 py-2">
         <span className="mr-auto text-xs font-semibold text-accent-foreground">{m.selected}</span>
-        <span className="primary-button button-sm !min-h-7 !px-2.5 text-[11px]">
+        <span className="primary-button button-sm min-h-7! px-2.5! text-[11px]">
           <Check className="size-3.5" aria-hidden />
           {m.approve}
         </span>
-        <span className="secondary-button button-sm !min-h-7 !px-2.5 text-[11px]">{m.sendBack}</span>
-        <span className="secondary-button button-sm hidden !min-h-7 !px-2.5 text-[11px] min-[420px]:inline-flex">{m.markPaid}</span>
+        <span className="secondary-button button-sm min-h-7! px-2.5! text-[11px]">{m.sendBack}</span>
+        <span className="secondary-button button-sm hidden min-h-7! px-2.5! text-[11px] min-[420px]:inline-flex">{m.markPaid}</span>
       </div>
 
       <ul className="divide-y divide-border border-t border-border">
