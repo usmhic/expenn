@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Download, Timer } from "lucide-react";
 import { cookies } from "next/headers";
+import { PageHeader } from "@/components/layout/page";
 import { AppShell } from "@/components/layout/navigation";
 import { ReviewQueue } from "@/components/review-queue";
 import { apiClient } from "@/lib/api-client";
@@ -55,17 +56,12 @@ export default async function AdminExpensesPage({
   return (
     <AppShell role={role} breadcrumbs={[{ label: "Review" }]}>
       <section className="w-full space-y-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="text-xl font-bold">Review &amp; pay</h1>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              Approve submitted expenses, then mark them paid once the money is out.
-            </p>
-          </div>
-          <a href={exportHref} className="secondary-button rounded-lg text-sm" download>
-            <Download className="size-4" /> Export CSV
-          </a>
-        </div>
+        <PageHeader
+          title="Review & pay"
+          description="Approve submitted expenses, then mark them paid once the money is out."
+          actions={<a href={exportHref} className="secondary-button" download><Download className="size-4" /> Export CSV</a>}
+          className="mb-0"
+        />
 
         <div className="grid gap-3 sm:grid-cols-3">
           <SummaryTile label="Waiting for review" value={formatTotals(pick(summary.byCurrency, "pending"), "Nothing pending")} sub={`${counts.submitted} expense${counts.submitted === 1 ? "" : "s"}`} tone={counts.submitted > 0 ? "amber" : "neutral"} />

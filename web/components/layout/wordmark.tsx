@@ -6,20 +6,28 @@ type WordmarkProps = {
   className?: string;
   iconClassName?: string;
   textClassName?: string;
+  href?: string;
+  /** Show only the "e" mark (collapsed sidebar, tight headers). */
+  compact?: boolean;
 };
 
-export function Wordmark({ className, iconClassName, textClassName }: WordmarkProps) {
+export function BrandMark({ className }: { className?: string }) {
   return (
-    <Link href="/" className={cn("inline-flex items-center gap-1", className)}>
-      <span className={cn("brand-icon-mark size-9 rounded-xl", iconClassName)}>
-        <Image src="/mark.png" alt="" width={48} height={48} className="size-full object-contain" />
-      </span>
-      <span
-        className={cn("font-display text-2xl font-bold leading-none text-ink", textClassName)}
-        style={{ fontVariationSettings: "'wght' 700" }}
-      >
-        Expenn
-      </span>
+    <span className={cn("brand-mark size-8", className)}>
+      <Image src="/mark.png" alt="" width={64} height={64} priority />
+    </span>
+  );
+}
+
+export function Wordmark({ className, iconClassName, textClassName, href = "/", compact }: WordmarkProps) {
+  return (
+    <Link href={href} className={cn("inline-flex items-center gap-2", className)} aria-label="Expenn home">
+      <BrandMark className={iconClassName} />
+      {!compact && (
+        <span className={cn("font-display text-[1.375rem] font-semibold leading-none tracking-tight text-ink", textClassName)}>
+          expenn
+        </span>
+      )}
     </Link>
   );
 }

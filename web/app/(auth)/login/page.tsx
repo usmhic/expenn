@@ -3,12 +3,15 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Wordmark } from "@/components/layout/wordmark";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
-import { getOidcInfo } from "@/lib/auth-client";
+import { AuthAside } from "@/components/auth/auth-aside";
+import { getServerOidcInfo } from "@/server/oidc";
 import { LoginClient } from "./login-client";
 
+export const metadata = { title: "Sign in" };
+
 /**
- * Server component — fetches OIDC info from the .NET API, checks if the user
- * is already signed in, then renders the client login UI.
+ * Server component — checks for an existing session, reads SSO availability from
+ * the API, then renders the client sign-in UI.
  */
 export default async function LoginPage({
   searchParams,
@@ -18,49 +21,39 @@ export default async function LoginPage({
   const { next, invite, error: queryError } = await searchParams;
   const safeNext = next?.startsWith("/") && !next.startsWith("//") ? next : undefined;
 
-  // Check if already signed in via cookie
-  const reqHeaders = await headers();
-  const cookieHeader = reqHeaders.get("cookie") ?? "";
-  const hasToken = cookieHeader.includes("expenn.token=");
-  if (hasToken) {
+  const cookieHeader = (await headers()).get("cookie") ?? "";
+  if (cookieHeader.includes("expenn.token=")) {
     if (invite) redirect(`/onboarding?invite=${encodeURIComponent(invite)}`);
     redirect(safeNext ?? "/onboarding");
   }
 
-  // Fetch OIDC provider info from the .NET API (server-side, no waterfall)
-  const oidcInfo = await getOidcInfo();
-
-  const callbackURL = invite
-    ? `/onboarding?invite=${encodeURIComponent(invite)}`
-    : safeNext ?? "/onboarding";
+  const oidcInfo = await getServerOidcInfo();
+  const callbackURL = invite ? `/onboarding?invite=${encodeURIComponent(invite)}` : safeNext ?? "/onboarding";
 
   return (
-    <main className="auth-screen min-h-dvh bg-background px-4 py-8">
-      <section className="auth-card w-full max-w-[26rem]">
-        <div className="mb-6 flex items-center justify-between">
-          <Wordmark iconClassName="brand-icon-mark size-9" textClassName="text-xl" />
+    <main className="auth-layout">
+      <section className="flex min-h-dvh flex-col px-5 py-6 sm:px-10">
+        <div className="flex items-center justify-between">
+          <Wordmark />
           <ThemeToggle />
         </div>
-
-        <LoginClient
-          callbackURL={callbackURL}
-          oidcEnabled={oidcInfo.enabled}
-          oidcProviderName={oidcInfo.providerName}
-          initialError={queryError}
-        />
-
-        <p className="mt-5 text-center text-xs leading-5 text-muted-foreground">
-          By continuing you agree to our{" "}
-          <Link href="/terms" className="underline underline-offset-2 hover:text-foreground">
-            Terms
-          </Link>{" "}
-          and{" "}
-          <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground">
-            Privacy Policy
-          </Link>
-          .
-        </p>
+        <div className="mx-auto flex w-full max-w-[24rem] flex-1 flex-col justify-center py-10">
+          <LoginClient
+            callbackURL={callbackURL}
+            oidcEnabled={oidcInfo.enabled}
+            oidcProviderName={oidcInfo.providerName}
+            initialError={queryError}
+            invited={Boolean(invite)}
+          />
+          <p className="mt-8 text-center text-xs leading-5 text-muted-foreground">
+            By continuing you agree to our{" "}
+            <Link href="/terms" className="underline underline-offset-2 hover:text-foreground">Terms</Link> and{" "}
+            <Link href="/privacy" className="underline underline-offset-2 hover:text-foreground">Privacy Policy</Link>.
+          </p>
+        </div>
+        <p className="text-center text-xs text-subtle">New here? Enter your email — we&apos;ll create your account with the first code.</p>
       </section>
+      <AuthAside />
     </main>
   );
 }

@@ -19,6 +19,7 @@ const documentSchema = z.object({
   documentNumber: z.string().max(255).optional(),
   expiryDate: z.string().optional(),
   isSensitive: z.coerce.boolean().default(false),
+  tripId: z.string().optional(),
 });
 
 const workspaceSetupSchema = z.object({
@@ -158,6 +159,7 @@ export async function createDocumentAction(formData: FormData) {
       holderName: input.holderName || undefined,
       documentNumber: input.documentNumber || undefined,
       expiryDate: input.expiryDate || undefined,
+      tripId: input.tripId || undefined,
       isSensitive: input.isSensitive,
       file: file instanceof File && file.size > 0 ? file : undefined,
     });

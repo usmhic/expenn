@@ -49,7 +49,8 @@ Local setup, shared workspace ports, environment conventions, and `dev` workflow
 
 ## ✨ Two sides, one flow
 
-**For travelers** 🎒 — capture receipts on the go, log expenses against a trip, store passports
+**For travelers** 🎒 — plan multi-stop trips on a map (routes, travel times, optimised stop
+order), capture receipts on the go, log expenses against a trip, store passports
 and itineraries in the document vault, submit for reimbursement, fix anything that's sent back, and
 always see what you're owed.
 
@@ -68,6 +69,7 @@ capture ──▶ log against a trip ──▶ submit ──▶ review ──▶
 |---|---|---|
 | 🌍 | **Web** | Workspace dashboards, trip management, the review queue, Fumadocs help center |
 | 🎒 | **Traveler** | Personal expense log, trip view, document vault, reimbursement status |
+| 🗺️ | **Trip planner** | Multi-stop itineraries on a map, routes by car/bike/foot, alternatives, stop optimisation (OpenRouteService) |
 | 📱 | **Mobile** | Expo app with OTP sign-in, camera receipt capture, biometrics, offline-first sync |
 | ⚙️ | **API** | .NET 9 API — owns auth, roles, business rules, and the PostgreSQL schema |
 | 📬 | **Async** | MassTransit over RabbitMQ for background work and notifications |

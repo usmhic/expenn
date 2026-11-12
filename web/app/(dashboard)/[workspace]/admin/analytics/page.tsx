@@ -50,15 +50,15 @@ export default async function AdminAnalyticsPage({
   return (
     <AppShell role="admin" breadcrumbs={[{ label: "Analytics" }]}>
       <section className="w-full space-y-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="page-header mb-0">
           <div>
-            <h1 className="text-xl font-bold">Analytics</h1>
-            <p className="mt-0.5 text-sm text-muted-foreground">Where the money goes, and how fast people get paid back.</p>
+            <h1 className="page-title">Analytics</h1>
+            <p className="page-description">Where the money goes, and how fast people get paid back.</p>
           </div>
           <div className="flex flex-wrap items-center gap-1.5" aria-label="Filters">
-            <Link href={href({ year: year - 1 })} className="secondary-button min-h-8 rounded-md px-2.5 text-xs" aria-label="Previous year">‹</Link>
+            <Link href={href({ year: year - 1 })} className="secondary-button button-sm px-2.5" aria-label="Previous year">‹</Link>
             <span className="min-w-12 text-center text-sm font-semibold tabular-nums">{year}</span>
-            <Link href={href({ year: year + 1 })} className="secondary-button min-h-8 rounded-md px-2.5 text-xs" aria-label="Next year">›</Link>
+            <Link href={href({ year: year + 1 })} className="secondary-button button-sm px-2.5" aria-label="Next year">›</Link>
             {currencies.length > 1 && (
               <span className="ml-2 flex gap-1">
                 {currencies.map((c) => (

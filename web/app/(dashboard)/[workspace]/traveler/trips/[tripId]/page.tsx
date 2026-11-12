@@ -1,15 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Camera, FileText, ReceiptText } from "lucide-react";
+import {
+  CalendarDays, Camera, CheckCircle2, Clock, FileText, MapPin, Receipt, Route as RouteIcon, ShieldCheck, Wallet,
+} from "lucide-react";
 import { cookies } from "next/headers";
 import { AppShell, StatusBadge } from "@/components/layout/navigation";
-import { RequestApprovalDialog } from "@/components/dialogs";
-import { HeroStat } from "@/components/ui/hero-stat";
-import { apiClient } from "@/lib/api-client";
+import { EmptyState, PageHeader, SectionCard, Stat } from "@/components/layout/page";
+import { CreateExpenseDialog, RequestApprovalDialog } from "@/components/dialogs";
+import { TripPlannerSection } from "@/components/trips/trip-planner-section";
+import { apiClient, type ItineraryDto } from "@/lib/api-client";
+import { formatMoney } from "@/lib/expenses";
+import { formatDateRange, formatDistance, formatDuration, tripDays, tripPhase } from "@/lib/trips";
 
-function fmt(date: string | Date) {
-  const dateObj = typeof date === "string" ? new Date(date) : date;
-  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(dateObj);
+function fmt(date: string) {
+  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(date));
 }
 
 export default async function TravelerTripDetailPage({ params }: { params: Promise<{ workspace: string; tripId: string }> }) {
@@ -19,157 +23,180 @@ export default async function TravelerTripDetailPage({ params }: { params: Promi
   const trip = await api.trips.getById(tripId).catch(() => null);
   if (!trip) return notFound();
 
-  const [expenses, allDocuments, approvals, allTrips, currentUser, travelers] = await Promise.all([
+  const [expenses, allDocuments, approvals, allTrips, currentUser, travelers, itinerary, orgs] = await Promise.all([
     api.expenses.list({ tripId, mine: true }),
-    api.documents.list({}),
+    api.documents.list({}).catch(() => []),
     api.trips.getApprovals({ tripId, mine: true }),
     api.trips.list({ mine: true }),
     api.auth.me(),
     api.trips.getTravelers(tripId),
+    api.trips.getItinerary(tripId).catch((): ItineraryDto => ({ tripId, profile: "driving-car", stops: [], routingEnabled: false })),
+    api.organizations.list().catch(() => []),
   ]);
 
+  const personal = orgs.find((o) => o.slug === workspace)?.accountType === "personal";
   const documents = allDocuments.filter((d) => d.tripId === tripId);
   const approval = approvals[0];
-  const total = expenses
+  const spent = expenses
     .filter((e) => e.currency === trip.currency && e.status !== "rejected")
     .reduce((sum, e) => sum + Number(e.amount), 0);
   const canRequestApproval = !approval || approval.status === "rejected" || approval.status === "cancelled";
   const isAssigned = travelers.some((t) => t.userId === currentUser.id);
-
-  const tripBreadcrumbs = [
-    { label: "Trips", href: root },
-    {
-      label: trip.name,
-      items: allTrips.filter((t) => t.id !== trip.id).map((t) => ({
-        label: t.name,
-        href: `${root}/trips/${t.id}`,
-      })),
-    },
-  ];
-
   const budget = Number(trip.budget);
-  const budgetPct = budget > 0 ? Math.min(100, Math.round((total / budget) * 100)) : 0;
-  const budgetOver = total > budget && budget > 0;
+  const budgetPct = budget > 0 ? Math.round((spent / budget) * 100) : 0;
+  const phase = tripPhase(trip.startDate, trip.endDate);
+  const route = itinerary.route;
 
   return (
-    <AppShell role="traveler" breadcrumbs={tripBreadcrumbs}>
-      <section className="w-full space-y-5">
-        {/* Hero */}
-        <article className="trip-detail-hero">
-          <div className="min-w-0">
-            <div className="mb-2 flex flex-wrap items-center gap-2">
-              <StatusBadge value={trip.status} />
-              {approval && <StatusBadge value={approval.status} />}
-            </div>
-            <h1 className="text-xl font-bold">{trip.name}</h1>
-            <p className="mt-0.5 text-sm text-muted-foreground">{trip.destination} · {fmt(trip.startDate)} – {fmt(trip.endDate)}</p>
-          </div>
-          <div className="flex flex-wrap gap-2 sm:shrink-0">
-            <HeroStat label="Budget" value={`${trip.currency} ${budget.toFixed(0)}`} />
-            <HeroStat label="Spent" value={`${trip.currency} ${total.toFixed(0)}`} highlight={budgetOver} />
-          </div>
-        </article>
+    <AppShell
+      role="traveler"
+      personal={personal}
+      breadcrumbs={[
+        { label: "Trips", href: `${root}/trips` },
+        {
+          label: trip.name,
+          items: allTrips.filter((t) => t.id !== trip.id).map((t) => ({ label: t.name, href: `${root}/trips/${t.id}` })),
+        },
+      ]}
+    >
+      <PageHeader
+        eyebrow={
+          <span className="flex flex-wrap items-center gap-2 normal-case tracking-normal">
+            <StatusBadge value={trip.status} />
+            {approval && <StatusBadge value={approval.status} label={approval.status === "requested" ? "Approval pending" : approval.status === "approved" ? "Approved to travel" : undefined} />}
+            <span className="text-xs font-medium text-muted-foreground">
+              {phase.kind === "ongoing" ? `Day ${phase.days} of ${tripDays(trip.startDate, trip.endDate)}` : phase.kind === "upcoming" ? `Starts in ${phase.days} day${phase.days === 1 ? "" : "s"}` : "Trip ended"}
+            </span>
+          </span>
+        }
+        title={trip.name}
+        description={
+          <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span className="flex items-center gap-1.5"><MapPin className="size-4" />{trip.routeSummary ?? trip.destination}</span>
+            <span className="flex items-center gap-1.5"><CalendarDays className="size-4" />{formatDateRange(trip.startDate, trip.endDate)}</span>
+          </span>
+        }
+        actions={
+          <>
+            {canRequestApproval && isAssigned && !personal && <RequestApprovalDialog tripId={trip.id} />}
+            <Link href={`${root}/capture`} className="secondary-button"><Camera className="size-4" /> Capture</Link>
+            <CreateExpenseDialog
+              trips={[{ id: trip.id, name: trip.name, currency: trip.currency, status: "active" }]}
+              defaultCurrency={trip.currency}
+              defaults={{ tripId: trip.id, currency: trip.currency }}
+            />
+          </>
+        }
+      />
 
-        {/* Budget bar */}
-        {budget > 0 && (
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Budget used</span>
-              <span className={budgetOver ? "text-rose-600 dark:text-rose-400 font-semibold" : ""}>{budgetPct}%</span>
-            </div>
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
-              <div
-                className={`h-full rounded-full transition-all ${budgetOver ? "bg-rose-500" : "bg-primary"}`}
-                style={{ width: `${budgetPct}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Approval */}
-        <article className="card">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-base font-semibold">Travel approval</h2>
-              <p className="mt-0.5 text-sm text-muted-foreground">
-                {approval
-                  ? approval.status === "approved"
-                    ? "Your travel has been approved."
-                    : approval.status === "rejected"
-                      ? "Your request was rejected — you can re-submit."
-                      : "Your request is under review."
-                  : isAssigned
-                    ? "Request approval before your trip starts."
-                    : "You are not assigned to this trip."}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              {approval && <StatusBadge value={approval.status} />}
-              {canRequestApproval && isAssigned && <RequestApprovalDialog tripId={trip.id} />}
-            </div>
-          </div>
-          {approval && !canRequestApproval && (
-            <p className="mt-3 rounded-md border border-border bg-secondary/55 p-3 text-sm text-muted-foreground">
-              Requested on {fmt(approval.createdAt)}{approval.purpose ? ` — ${approval.purpose}` : ""}.
-            </p>
-          )}
-        </article>
-
-        {/* Expenses */}
-        <article className="card p-0">
-          <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-4 pb-2">
-            <div>
-              <h2 className="text-base font-semibold">Expenses</h2>
-              <p className="text-xs text-muted-foreground">
-                {expenses.length} expense{expenses.length !== 1 ? "s" : ""} · {trip.currency} {total.toFixed(2)} total
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Link href={`${root}/capture`} className="secondary-button rounded-md text-sm">
-                <Camera className="size-4" /> Capture
-              </Link>
-              <Link href={`${root}/expenses`} className="secondary-button rounded-md text-sm">
-                <ReceiptText className="size-4" /> All expenses
-              </Link>
-            </div>
-          </div>
-          <div className="divide-y divide-border/70">
-            {expenses.map((e) => (
-              <div key={e.id} className="flex items-center gap-3 px-4 py-2.5">
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold">{e.merchant}</span>
-                  <span className="block truncate text-xs text-muted-foreground">{e.category} · {fmt(e.expenseDate)}</span>
-                </span>
-                <span className="text-right shrink-0">
-                  <span className="block text-sm font-semibold">{e.currency} {Number(e.amount).toFixed(2)}</span>
-                  <StatusBadge value={e.status} />
-                </span>
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="stat">
+          <span className="stat-label"><Wallet className="size-4" /> Spent</span>
+          <span className="stat-value">{formatMoney(spent, trip.currency, { compact: true })}</span>
+          {budget > 0 ? (
+            <>
+              <div className="progress-track mt-1">
+                <div className={`progress-bar ${budgetPct > 100 ? "bg-destructive" : budgetPct > 85 ? "bg-amber-500" : ""}`} style={{ width: `${Math.min(100, budgetPct)}%` }} />
               </div>
-            ))}
-            {expenses.length === 0 && <p className="px-4 py-8 text-center text-sm text-muted-foreground">No expenses on this trip yet.</p>}
-          </div>
-        </article>
+              <span className="stat-sub">{budgetPct}% of {formatMoney(budget, trip.currency, { compact: true })} budget</span>
+            </>
+          ) : (
+            <span className="stat-sub">No budget set</span>
+          )}
+        </div>
+        <Stat icon={RouteIcon} label="Route" value={route ? formatDistance(route.distanceMeters) : "—"} sub={route ? `${formatDuration(route.durationSeconds)} travel · ${itinerary.stops.length} stops` : "Add stops to plan it"} />
+        <Stat icon={Receipt} label="Expenses" value={String(expenses.length)} sub={`${expenses.filter((e) => e.status === "draft").length} draft · ${expenses.filter((e) => e.status === "submitted").length} in review`} />
+        <Stat icon={FileText} label="Documents" value={String(documents.length)} sub="Tickets, bookings, visas" />
+      </div>
 
-        {/* Documents */}
-        <article className="card">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-            <h2 className="text-base font-semibold">Documents</h2>
-            <Link href={`${root}/documents`} className="text-xs font-semibold text-primary hover:underline">Manage</Link>
-          </div>
-          <div className="space-y-2">
-            {documents.map((doc) => (
-              <Link key={doc.id} href={`${root}/documents/${doc.id}`} className="flex items-center gap-2.5 rounded-md border border-border p-2.5 text-sm hover:bg-secondary/55 transition-colors">
-                <FileText className="size-4 shrink-0 text-primary" />
-                <span className="min-w-0 flex-1 truncate">{doc.title}</span>
-                <StatusBadge value={doc.kind} />
-              </Link>
-            ))}
-            {documents.length === 0 && (
-              <p className="text-sm text-muted-foreground">No documents attached to this trip.</p>
-            )}
-          </div>
-        </article>
+      <section className="mb-6" aria-label="Route planner">
+        <TripPlannerSection
+          trip={{ id: trip.id, name: trip.name, currency: trip.currency, startDate: trip.startDate, endDate: trip.endDate, status: trip.status }}
+          itinerary={itinerary}
+          canEdit={isAssigned || personal}
+          canClaimMileage={isAssigned || personal}
+        />
       </section>
+
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <SectionCard
+          title="Expenses on this trip"
+          description={expenses.length > 0 ? `${formatMoney(spent, trip.currency)} logged` : undefined}
+          action={<Link href={`${root}/expenses?trip=${trip.id}`} className="text-sm font-medium text-primary hover:underline">View all</Link>}
+        >
+          {expenses.length === 0 ? (
+            <EmptyState icon={Receipt} title="No expenses yet" description="Snap receipts as you go — they'll be filed under this trip." />
+          ) : (
+            <ul className="divide-list">
+              {expenses.slice(0, 8).map((e) => (
+                <li key={e.id} className="list-row">
+                  <span className="icon-tile size-9"><Receipt className="size-4" /></span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">{e.merchant}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{fmt(e.expenseDate)} · {e.category}</span>
+                  </span>
+                  <span className="flex flex-col items-end gap-1">
+                    <span className="text-sm font-semibold tabular-nums">{formatMoney(e.amount, e.currency)}</span>
+                    <StatusBadge value={e.status} />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </SectionCard>
+
+        <div className="space-y-5">
+          {!personal && (
+            <section className="card">
+              <div className="flex items-start gap-3">
+                <span className="icon-tile icon-tile-primary"><ShieldCheck className="size-5" /></span>
+                <div className="min-w-0 flex-1">
+                  <h2 className="card-title">Travel approval</h2>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    {!approval
+                      ? isAssigned ? "Ask your manager to approve this trip before you go." : "You're not assigned to this trip."
+                      : approval.status === "approved"
+                        ? `Approved${approval.decidedAt ? ` on ${fmt(approval.decidedAt)}` : ""}. Have a good trip.`
+                        : approval.status === "rejected"
+                          ? "Your request was declined. You can update it and ask again."
+                          : `Requested on ${fmt(approval.createdAt)} — waiting for a decision.`}
+                  </p>
+                  {approval?.purpose && <p className="mt-2 rounded-lg bg-muted px-3 py-2 text-sm">{approval.purpose}</p>}
+                </div>
+              </div>
+              {approval?.status === "approved" && (
+                <p className="mt-3 flex items-center gap-1.5 text-sm font-medium text-teal-700 dark:text-teal-300"><CheckCircle2 className="size-4" /> Cleared to travel</p>
+              )}
+              {approval?.status === "requested" && (
+                <p className="mt-3 flex items-center gap-1.5 text-sm font-medium text-amber-700 dark:text-amber-300"><Clock className="size-4" /> Pending review</p>
+              )}
+            </section>
+          )}
+
+          <SectionCard
+            title="Documents"
+            action={<Link href={`${root}/documents`} className="text-sm font-medium text-primary hover:underline">Manage</Link>}
+          >
+            {documents.length === 0 ? (
+              <p className="px-5 py-6 text-sm text-muted-foreground">No documents attached to this trip yet. Add tickets or bookings from your vault.</p>
+            ) : (
+              <ul className="divide-list">
+                {documents.map((doc) => (
+                  <li key={doc.id}>
+                    <Link href={`${root}/documents/${doc.id}`} className="list-row">
+                      <span className="icon-tile size-9"><FileText className="size-4" /></span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">{doc.title}</span>
+                        <span className="block truncate text-xs capitalize text-muted-foreground">{doc.kind.replace("_", " ")}</span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </SectionCard>
+        </div>
+      </div>
     </AppShell>
   );
 }

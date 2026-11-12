@@ -1,5 +1,6 @@
 import { Mail, Shield, Users } from "lucide-react";
 import { cookies } from "next/headers";
+import { PageHeader } from "@/components/layout/page";
 import { AppShell, StatusBadge } from "@/components/layout/navigation";
 import { AddToTeamDialog, CreateTeamDialog, InviteMemberDialog } from "@/components/dialogs";
 import { apiClient } from "@/lib/api-client";
@@ -38,23 +39,18 @@ export default async function AdminSettingsPage({
           </div>
         )}
 
-        <div>
-          <h1 className="text-xl font-bold">Settings</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Members and teams for this workspace.
-          </p>
-        </div>
+        <PageHeader title="People & settings" description="Invite colleagues, set their roles and organise them into teams." className="mb-0" />
 
         {/* ── Members ── */}
         <article className="card">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <div className="flex items-center gap-2">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
                 <Users className="size-3.5" />
               </span>
               <h2 className="text-base font-semibold">Members</h2>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs text-muted-foreground">
                 {members.length} member{members.length === 1 ? "" : "s"}
               </span>
@@ -93,14 +89,14 @@ export default async function AdminSettingsPage({
 
         {/* ── Teams ── */}
         <article className="card">
-          <div className="flex items-center justify-between gap-3 mb-3">
-            <div className="flex items-center gap-2">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
                 <Shield className="size-3.5" />
               </span>
               <h2 className="text-base font-semibold">Teams</h2>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs text-muted-foreground">{teams.length} team{teams.length === 1 ? "" : "s"}</span>
               {isOwner && (
                 <>

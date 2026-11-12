@@ -1,234 +1,146 @@
 import Link from "next/link";
-import { ArrowRight, MapPin, Plane, Users } from "lucide-react";
+import { ArrowRight, CheckCircle2, Clock, Map as MapIcon, Plane, Receipt, Wallet } from "lucide-react";
 import { cookies } from "next/headers";
 import { AppShell, StatusBadge } from "@/components/layout/navigation";
-import { BulkApproveButtons, CreateTripDialog, ReviewApprovalButtons } from "@/components/dialogs";
+import { EmptyState, PageHeader, SectionCard, Stat } from "@/components/layout/page";
+import { CreateTripDialog, ReviewApprovalButtons } from "@/components/dialogs";
+import { FlagChips } from "@/components/expense-flags";
+import { RouteThumbnail } from "@/components/trips/trip-card";
 import { apiClient } from "@/lib/api-client";
-import { formatMoney } from "@/lib/expenses";
+import { formatMoney, formatTotals, pick } from "@/lib/expenses";
+import { formatDateRange, tripPhase } from "@/lib/trips";
 
-function formatDate(date: string | Date) {
-  const dateObj = typeof date === "string" ? new Date(date) : date;
-  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(dateObj);
+function greeting() {
+  const hour = new Date().getUTCHours();
+  return hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 }
 
-export default async function AdminDashboardPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ workspace: string }>;
-  searchParams: Promise<{ error?: string }>;
-}) {
-  const [{ workspace }, { error }] = await Promise.all([params, searchParams]);
-  const adminRoot = `/${workspace}/admin`;
+export default async function AdminOverviewPage({ params }: { params: Promise<{ workspace: string }> }) {
+  const { workspace } = await params;
+  const root = `/${workspace}/admin`;
   const api = apiClient({ cookie: (await cookies()).toString() });
-  const currentUser = await api.auth.me();
-  const orgId = currentUser.activeOrganizationId || workspace;
-  const [trips, teams, members, approvals, expenses] = await Promise.all([
+  const me = await api.auth.me();
+  const orgId = me.activeOrganizationId ?? "";
+  const [trips, teams, members, approvals, submitted, summary] = await Promise.all([
     api.trips.list({}),
     api.organizations.getTeams(orgId),
     api.organizations.getMembers(orgId),
-    api.trips.getApprovals({}),
-    api.expenses.list({}),
+    api.trips.getApprovals({ status: "requested" }),
+    api.expenses.list({ status: "submitted" }),
+    api.expenses.summary(),
   ]);
-  const role = currentUser.organizationRole === "manager" ? "manager" : "admin";
+  const role = me.organizationRole === "manager" ? "manager" : "admin";
+  const firstName = (me.name ?? "").split(/[\s@.]/)[0];
 
-  const pendingApprovals = approvals.filter((a) => a.status === "requested");
-  const pendingExpenses = expenses.filter((e) => e.status === "submitted");
-  const travelers = members.filter((m) => m.role === "traveler");
-
-  const tripsByTeam = new Map<string, typeof trips>();
-  for (const trip of trips) {
-    const key = trip.teamId ?? "__none__";
-    const arr = tripsByTeam.get(key) ?? [];
-    arr.push(trip);
-    tripsByTeam.set(key, arr);
-  }
+  const live = trips
+    .map((t) => ({ trip: t, phase: tripPhase(t.startDate, t.endDate) }))
+    .filter(({ trip, phase }) => phase.kind !== "past" && trip.status !== "draft" && trip.status !== "archived")
+    .sort((a, b) => a.trip.startDate.localeCompare(b.trip.startDate));
+  const ongoing = live.filter((t) => t.phase.kind === "ongoing").length;
+  const oldestReview = [...submitted].sort((a, b) => (a.submittedAt ?? a.createdAt).localeCompare(b.submittedAt ?? b.createdAt));
 
   return (
-    <AppShell role={role} breadcrumbs={[{ label: "Trips" }]}>
-      <div className="w-full space-y-5">
-        {error && (
-          <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200">
-            {decodeURIComponent(error)}
-          </div>
-        )}
+    <AppShell role={role} breadcrumbs={[{ label: "Overview" }]}>
+      <PageHeader
+        eyebrow={me.activeOrganizationName}
+        title={`${greeting()}${firstName ? `, ${firstName}` : ""}`}
+        description={
+          submitted.length + approvals.length === 0
+            ? "Nothing is waiting on you. Here's what's happening across your trips."
+            : `${submitted.length} expense${submitted.length === 1 ? "" : "s"} and ${approvals.length} travel request${approvals.length === 1 ? "" : "s"} are waiting on you.`
+        }
+        actions={
+          <>
+            <Link href={`${root}/expenses`} className="secondary-button"><Receipt className="size-4" /> Review expenses</Link>
+            <CreateTripDialog teams={teams} travelers={members.map((m) => ({ userId: m.userId, name: m.name || m.email }))} tripHrefBase={`${root}/trips`} />
+          </>
+        }
+      />
 
-        {/* ── Header ── */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-xl font-bold">Trips</h1>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              {trips.length} trip{trips.length !== 1 ? "s" : ""}
-              {pendingApprovals.length > 0 && (
-                <span className="ml-2 font-medium text-amber-600 dark:text-amber-400">
-                  · {pendingApprovals.length} approval{pendingApprovals.length !== 1 ? "s" : ""} pending
-                </span>
-              )}
-              {pendingExpenses.length > 0 && (
-                <span className="ml-2 font-medium text-blue-600 dark:text-blue-400">
-                  · {pendingExpenses.length} expense{pendingExpenses.length !== 1 ? "s" : ""} to review
-                </span>
-              )}
-            </p>
-          </div>
-          <CreateTripDialog teams={teams} travelers={travelers} />
-        </div>
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Stat href={`${root}/expenses`} icon={Receipt} tone="primary" label="To review" value={String(submitted.length)} sub={formatTotals(pick(summary.byCurrency, "pending"), "Nothing pending")} />
+        <Stat href={`${root}/expenses?tab=approved`} icon={Wallet} tone="mint" label="Approved, to pay" value={formatTotals(pick(summary.byCurrency, "owed"), "—")} sub="Reimbursable, not paid yet" />
+        <Stat href={`${root}/trips`} icon={Plane} tone="warning" label="Travel requests" value={String(approvals.length)} sub={approvals.length ? "Waiting for a decision" : "All decided"} />
+        <Stat href={`${root}/trips`} icon={MapIcon} label="Trips under way" value={String(ongoing)} sub={`${live.length - ongoing} coming up`} />
+      </div>
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
-          {/* ── Left: trips list ── */}
-          <div className="min-w-0 space-y-4">
-            {/* Trips by team */}
-            {teams.map((team) => {
-              const teamTrips = tripsByTeam.get(team.id) ?? [];
-              if (teamTrips.length === 0) return null;
-              return (
-                <article key={team.id} className="card p-0">
-                  <div className="flex items-center justify-between gap-3 px-4 pt-3 pb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="flex size-6 items-center justify-center rounded-md bg-secondary">
-                        <Users className="size-3 text-muted-foreground" />
-                      </span>
-                      <Link href={`${adminRoot}/groups/${team.id}`} className="text-sm font-semibold hover:text-primary hover:underline transition-colors">
-                        {team.name}
-                      </Link>
-                    </div>
-                    <span className="text-xs text-muted-foreground">{teamTrips.length} trip{teamTrips.length === 1 ? "" : "s"}</span>
-                  </div>
-                  <div className="divide-y divide-border/60">
-                    {teamTrips.map((trip) => {
-                      const pending = approvals.filter((a) => a.tripId === trip.id && a.status === "requested").length;
-                      return (
-                        <Link key={trip.id} href={`${adminRoot}/trips/${trip.id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-secondary/50 transition-colors">
-                          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                            <MapPin className="size-3.5" />
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-semibold">{trip.name}</span>
-                            <span className="block truncate text-xs text-muted-foreground">
-                              {trip.destination} · {formatDate(trip.startDate)} – {formatDate(trip.endDate)}
-                            </span>
-                          </span>
-                          <div className="flex items-center gap-2 shrink-0">
-                            {pending > 0 && (
-                              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-400/15 dark:text-amber-200">
-                                {pending} pending
-                              </span>
-                            )}
-                            <StatusBadge value={trip.status} />
-                            <ArrowRight className="size-3.5 text-muted-foreground/50" />
-                          </div>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </article>
-              );
-            })}
-
-            {/* Unassigned */}
-            {(tripsByTeam.get("__none__") ?? []).length > 0 && (
-              <article className="card p-0">
-                <div className="px-4 pt-3 pb-2">
-                  <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">No team assigned</h2>
-                </div>
-                <div className="divide-y divide-border/60">
-                  {(tripsByTeam.get("__none__") ?? []).map((trip) => (
-                    <Link key={trip.id} href={`${adminRoot}/trips/${trip.id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-secondary/50 transition-colors">
-                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                        <MapPin className="size-3.5" />
-                      </span>
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
+        <div className="min-w-0 space-y-5">
+          <SectionCard
+            title="Expenses to review"
+            description={oldestReview[0] ? `Oldest submitted ${new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(new Date(oldestReview[0].submittedAt ?? oldestReview[0].createdAt))}` : undefined}
+            action={<Link href={`${root}/expenses`} className="flex items-center gap-1 text-sm font-medium text-primary hover:underline">Open queue <ArrowRight className="size-3.5" /></Link>}
+          >
+            {oldestReview.length === 0 ? (
+              <EmptyState icon={CheckCircle2} title="Inbox zero" description="No expenses are waiting for a decision." />
+            ) : (
+              <ul className="divide-list">
+                {oldestReview.slice(0, 6).map((e) => (
+                  <li key={e.id}>
+                    <Link href={`${root}/expenses`} className="list-row">
+                      <span className="avatar">{(e.travelerName ?? "?")[0]?.toUpperCase()}</span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold">{trip.name}</span>
-                        <span className="block truncate text-xs text-muted-foreground">{trip.destination} · {formatDate(trip.startDate)}</span>
+                        <span className="block truncate text-sm font-medium">{e.merchant}</span>
+                        <span className="block truncate text-xs text-muted-foreground">{e.travelerName} · {e.category}{e.tripName ? ` · ${e.tripName}` : ""}</span>
+                        <FlagChips flags={e.flags} className="mt-1" />
                       </span>
-                      <StatusBadge value={trip.status} />
-                      <ArrowRight className="size-3.5 text-muted-foreground/50" />
+                      <span className="text-sm font-semibold tabular-nums">{formatMoney(e.amount, e.currency)}</span>
                     </Link>
-                  ))}
-                </div>
-              </article>
-            )}
-
-            {trips.length === 0 && (
-              <div className="rounded-xl border border-dashed border-border p-10 text-center">
-                <Plane className="mx-auto mb-3 size-8 text-muted-foreground/30" />
-                <p className="text-sm text-muted-foreground">No trips yet. Click &ldquo;New trip&rdquo; to create your first trip.</p>
-              </div>
-            )}
-          </div>
-
-          {/* ── Right: approval queue ── */}
-          <aside className="space-y-4">
-            <article className="card p-0">
-              <div className="px-4 pt-3 pb-2 border-b border-border/60 space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-sm font-semibold">Approval queue</h2>
-                  {pendingApprovals.length > 0 ? (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-400/15 dark:text-amber-200">
-                      {pendingApprovals.length}
-                    </span>
-                  ) : (
-                    <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">All clear</span>
-                  )}
-                </div>
-                {pendingApprovals.length > 1 && (
-                  <BulkApproveButtons approvalIds={pendingApprovals.map((a) => a.id)} />
-                )}
-              </div>
-              <div className="divide-y divide-border/60">
-                {pendingApprovals.slice(0, 8).map((approval) => (
-                  <div key={approval.id} className="px-4 py-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">{approval.travelerName}</p>
-                        <p className="truncate text-xs text-muted-foreground">{approval.tripName}</p>
-                      </div>
-                      <StatusBadge value={approval.status} />
-                    </div>
-                    {approval.purpose && <p className="mt-1 text-xs text-muted-foreground line-clamp-1">{approval.purpose}</p>}
-                    <div className="mt-2">
-                      <ReviewApprovalButtons approvalId={approval.id} />
-                    </div>
-                  </div>
+                  </li>
                 ))}
-                {pendingApprovals.length === 0 && (
-                  <p className="px-4 py-6 text-center text-sm text-muted-foreground">No pending approvals.</p>
-                )}
-              </div>
-            </article>
-
-            {pendingExpenses.length > 0 && (
-              <article className="card p-0">
-                <div className="flex items-center justify-between gap-3 px-4 pt-3 pb-2 border-b border-border/60">
-                  <Link href={`${adminRoot}/expenses`} className="text-sm font-semibold hover:text-primary">Expense review</Link>
-                  <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-400/15 dark:text-blue-200">
-                    {pendingExpenses.length}
-                  </span>
-                </div>
-                <div className="divide-y divide-border/60">
-                  {pendingExpenses.slice(0, 5).map((e) => (
-                    <Link
-                      key={e.id}
-                      href={`${adminRoot}/expenses`}
-                      className="flex items-center gap-3 px-4 py-2.5 hover:bg-secondary/50 transition-colors"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold">{e.merchant}</p>
-                        <p className="truncate text-xs text-muted-foreground">{e.travelerName} · {e.category}</p>
-                      </div>
-                      <span className="text-sm font-semibold shrink-0 tabular-nums">{formatMoney(e.amount, e.currency)}</span>
-                    </Link>
-                  ))}
-                </div>
-                {pendingExpenses.length > 5 && (
-                  <Link href={`${adminRoot}/expenses`} className="block px-4 py-2 text-xs font-semibold text-primary hover:underline">
-                    Review all {pendingExpenses.length} →
-                  </Link>
-                )}
-              </article>
+              </ul>
             )}
-          </aside>
+          </SectionCard>
+
+          {approvals.length > 0 && (
+            <SectionCard title="Travel requests" description="Approve before people book">
+              <ul className="divide-list">
+                {approvals.slice(0, 5).map((a) => (
+                  <li key={a.id} className="list-row flex-wrap">
+                    <span className="avatar">{a.travelerName[0]?.toUpperCase()}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{a.travelerName}</span>
+                      <Link href={`${root}/trips/${a.tripId}`} className="block truncate text-xs text-muted-foreground hover:text-primary">{a.tripName} · {a.destination}</Link>
+                    </span>
+                    <ReviewApprovalButtons approvalId={a.id} />
+                  </li>
+                ))}
+              </ul>
+            </SectionCard>
+          )}
         </div>
+
+        <SectionCard
+          title="Trips"
+          description="Under way and coming up"
+          action={<Link href={`${root}/trips`} className="text-sm font-medium text-primary hover:underline">All trips</Link>}
+        >
+          {live.length === 0 ? (
+            <EmptyState icon={MapIcon} title="No upcoming trips" description="Create a trip to assign travelers and plan the route." />
+          ) : (
+            <ul className="divide-list">
+              {live.slice(0, 6).map(({ trip, phase }) => (
+                <li key={trip.id}>
+                  <Link href={`${root}/trips/${trip.id}`} className="list-row items-start">
+                    <span className="h-12 w-16 shrink-0 overflow-hidden rounded-lg border border-border bg-muted/60">
+                      <RouteThumbnail points={trip.routePreview} className="h-full w-full" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{trip.name}</span>
+                      <span className="block truncate text-xs text-muted-foreground">{trip.routeSummary ?? trip.destination}</span>
+                      <span className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                        <Clock className="size-3" />
+                        {phase.kind === "ongoing" ? <span className="font-medium text-teal-700 dark:text-teal-300">Day {phase.days}</span> : `In ${phase.days} d`}
+                        <span>· {formatDateRange(trip.startDate, trip.endDate)}</span>
+                      </span>
+                    </span>
+                    <StatusBadge value={trip.status} />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </SectionCard>
       </div>
     </AppShell>
   );

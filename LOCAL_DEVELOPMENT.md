@@ -49,6 +49,13 @@ automatically; external environment variables take precedence. FreeSolo's web
 port is separate from the API's `PORT`.
 
 
+## Trip planning (optional)
+
+Place search, routes and stop optimisation call [OpenRouteService](https://openrouteservice.org).
+Create a free API key and set `OpenRouteService__ApiKey` in `.env`; without it the planner still
+lets you pin stops on the map but won't calculate routes. Map tiles default to OpenFreeMap
+(`NEXT_PUBLIC_MAP_STYLE_URL`, `NEXT_PUBLIC_MAP_STYLE_URL_DARK`).
+
 ## Brand assets
 
 `web/public/logo.png` is the source logo. Run

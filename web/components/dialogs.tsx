@@ -13,6 +13,7 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { DateButton } from "@/components/ui/date-button";
 import { ExpenseFormFields, type ExpenseFormTrip } from "@/components/expense-form";
 import type { ExpenseDto } from "@/lib/api-client";
+import { COMMON_CURRENCIES } from "@/lib/expenses";
 import { cn } from "@/lib/utils";
 import {
   addToTeamDialogAction,
@@ -43,10 +44,10 @@ function ErrorBanner({ message }: { message: string }) {
 function DialogFooterRow({ onClose }: { onClose: () => void }) {
   return (
     <div className="flex justify-end gap-2 pt-1">
-      <button type="button" className="secondary-button rounded-lg text-sm" onClick={onClose}>
+      <button type="button" className="secondary-button" onClick={onClose}>
         Cancel
       </button>
-      <SubmitButton pendingText="Saving…" className="primary-button rounded-lg text-sm">
+      <SubmitButton pendingText="Saving…" className="primary-button">
         Save
       </SubmitButton>
     </div>
@@ -75,11 +76,11 @@ function ConfirmDialog({
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle className="text-base font-semibold">{title}</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-muted-foreground">{description}</p>
         <div className="flex justify-end gap-2 pt-1">
-          <button type="button" className="secondary-button rounded-lg text-sm" onClick={onClose}>
+          <button type="button" className="secondary-button" onClick={onClose}>
             Cancel
           </button>
           {children}
@@ -93,98 +94,119 @@ function ConfirmDialog({
 export function CreateTripDialog({
   teams,
   travelers,
+  personal,
+  defaultCurrency = "USD",
+  tripHrefBase,
+  triggerClassName = "primary-button",
 }: {
   teams: { id: string; name: string }[];
   travelers: { userId: string; name: string }[];
+  /** Personal workspaces: no team or traveler pickers; the creator is the traveler. */
+  personal?: boolean;
+  defaultCurrency?: string;
+  /** After creating, open `${tripHrefBase}/${id}` so the user can plan the route. */
+  tripHrefBase?: string;
+  triggerClassName?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [formKey, setFormKey] = useState(0);
   const [state, action] = useActionState(createTripDialogAction, null as DialogState);
 
   useEffect(() => {
-    if (state?.success) {
-      startTransition(() => setOpen(false));
-      router.refresh();
-      toast.success("Trip created.");
-    }
-  }, [state?.success, router]);
+    if (!state?.success) return;
+    startTransition(() => {
+      setOpen(false);
+      setFormKey((k) => k + 1);
+    });
+    toast.success("Trip created. Add stops to plan the route.");
+    if (tripHrefBase && state.id) router.push(`${tripHrefBase}/${state.id}`);
+    else router.refresh();
+  }, [state, router, tripHrefBase]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button className="primary-button rounded-lg text-sm">
+        <button className={triggerClassName}>
           <Plus className="size-4" /> New trip
         </button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base font-semibold">
-            <span className="flex size-7 items-center justify-center rounded-md bg-gradient-primary text-primary-foreground">
-              <MapPin className="size-3.5" />
-            </span>
-            New trip
-          </DialogTitle>
+          <DialogTitle>Plan a new trip</DialogTitle>
+          <p className="text-sm text-muted-foreground">Set the basics now — you&apos;ll add stops and routes on the map next.</p>
         </DialogHeader>
-        <form action={action} className="grid gap-3">
+        <form key={formKey} action={action} className="grid gap-4">
           {state?.error && <ErrorBanner message={state.error} />}
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="grid gap-1 text-sm font-medium">
+            <label className="field sm:col-span-2">
               Trip name
-              <input name="name" required placeholder="Paris client visit" className="form-control font-normal" />
+              <input name="name" required minLength={2} placeholder="e.g. Berlin client summit" className="form-control" />
             </label>
-            <label className="grid gap-1 text-sm font-medium">
-              Destination
-              <input name="destination" required placeholder="Paris, France" className="form-control font-normal" />
+            <label className="field sm:col-span-2">
+              Main destination
+              <input name="destination" required minLength={2} placeholder="City or region" className="form-control" />
             </label>
-            <label className="grid gap-1 text-sm font-medium">
-              Start date
+            <label className="field">
+              Starts
               <DateButton name="startDate" required placeholder="Start date" className="w-full" />
             </label>
-            <label className="grid gap-1 text-sm font-medium">
-              End date
+            <label className="field">
+              Ends
               <DateButton name="endDate" required placeholder="End date" className="w-full" />
             </label>
-            <label className="grid gap-1 text-sm font-medium">
-              Budget
-              <input name="budget" type="number" min="0" step="0.01" required placeholder="5000" className="form-control font-normal" />
+            <label className="field">
+              Budget <span className="field-hint">Optional</span>
+              <input name="budget" type="number" min="0" step="0.01" inputMode="decimal" placeholder="0.00" className="form-control tabular-nums" />
             </label>
-            <label className="grid gap-1 text-sm font-medium">
+            <label className="field">
               Currency
-              <input name="currency" required defaultValue="USD" className="form-control font-normal uppercase" />
-            </label>
-            <label className="grid gap-1 text-sm font-medium">
-              Team
-              <select name="teamId" required className="form-control font-normal">
-                <option value="">Select team…</option>
-                {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              <select name="currency" defaultValue={defaultCurrency} className="form-control">
+                {Array.from(new Set([defaultCurrency, ...COMMON_CURRENCIES])).map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </label>
-            <label className="grid gap-1 text-sm font-medium">
-              Status
-              <select name="status" className="form-control font-normal">
-                <option value="active">Active</option>
-                <option value="draft">Draft</option>
-              </select>
-            </label>
+            {!personal && teams.length > 1 && (
+              <label className="field">
+                Team
+                <select name="teamId" required className="form-control" defaultValue="">
+                  <option value="" disabled>Choose a team…</option>
+                  {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </label>
+            )}
+            {!personal && teams.length === 1 && <input type="hidden" name="teamId" value={teams[0].id} />}
+            {!personal && (
+              <label className="field">
+                Status
+                <select name="status" className="form-control" defaultValue="active">
+                  <option value="active">Active</option>
+                  <option value="draft">Draft (not visible yet)</option>
+                </select>
+              </label>
+            )}
           </div>
-          {travelers.length > 0 && (
-            <div>
-              <p className="mb-2 text-sm font-medium">Assign travelers</p>
-              <div className="grid gap-2 sm:grid-cols-2">
+          {!personal && travelers.length > 0 && (
+            <fieldset className="grid gap-2">
+              <legend className="mb-2 text-[0.8125rem] font-semibold">Who&apos;s travelling?</legend>
+              <div className="flex flex-wrap gap-2">
                 {travelers.map((t) => (
-                  <label key={t.userId} className="traveler-check">
-                    <input type="checkbox" name="travelerUserIds" value={t.userId} />
-                    <span className="traveler-avatar">{t.name[0]?.toUpperCase()}</span>
-                    <span className="min-w-0 truncate text-sm">{t.name}</span>
+                  <label key={t.userId} className="chip chip-button cursor-pointer has-[:checked]:border-primary/45 has-[:checked]:bg-accent has-[:checked]:text-accent-foreground">
+                    <input type="checkbox" name="travelerUserIds" value={t.userId} className="checkbox" />
+                    {t.name}
                   </label>
                 ))}
               </div>
-            </div>
+            </fieldset>
           )}
-          {teams.length === 0 && (
-            <p className="text-xs text-amber-600 dark:text-amber-400">No teams yet — create one in Settings first.</p>
+          {!personal && teams.length === 0 && (
+            <p className="notice notice-warning text-xs">Create a team in People &amp; settings first — trips belong to a team.</p>
           )}
-          <DialogFooterRow onClose={() => setOpen(false)} />
+          <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+            <button type="button" className="secondary-button" onClick={() => setOpen(false)}>Cancel</button>
+            <SubmitButton pendingText="Creating…" className="primary-button" disabled={!personal && teams.length === 0}>
+              Create and plan route
+            </SubmitButton>
+          </div>
         </form>
       </DialogContent>
     </Dialog>
@@ -195,13 +217,13 @@ export function CreateTripDialog({
 function ExpenseFormFooter({ onClose, resubmit }: { onClose: () => void; resubmit?: boolean }) {
   return (
     <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
-      <button type="button" className="secondary-button rounded-lg text-sm" onClick={onClose}>
+      <button type="button" className="secondary-button" onClick={onClose}>
         Cancel
       </button>
-      <SubmitButton name="status" value="draft" pendingText="Saving…" className="secondary-button rounded-lg text-sm">
+      <SubmitButton name="status" value="draft" pendingText="Saving…" className="secondary-button">
         Save draft
       </SubmitButton>
-      <SubmitButton name="status" value="submitted" pendingText="Sending…" className="primary-button rounded-lg text-sm">
+      <SubmitButton name="status" value="submitted" pendingText="Sending…" className="primary-button">
         <Send className="size-4" /> {resubmit ? "Resubmit" : "Submit for review"}
       </SubmitButton>
     </div>
@@ -211,9 +233,18 @@ function ExpenseFormFooter({ onClose, resubmit }: { onClose: () => void; resubmi
 export function CreateExpenseDialog({
   trips,
   defaultCurrency,
+  defaults,
+  triggerLabel = "Add expense",
+  triggerClassName = "primary-button",
+  title = "Add expense",
 }: {
   trips: ExpenseFormTrip[];
   defaultCurrency?: string;
+  /** Prefill (e.g. a mileage claim from a planned route). */
+  defaults?: Partial<ExpenseDto>;
+  triggerLabel?: string;
+  triggerClassName?: string;
+  title?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -234,22 +265,17 @@ export function CreateExpenseDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button className="primary-button rounded-lg text-sm">
-          <Plus className="size-4" /> Add expense
+        <button className={triggerClassName}>
+          <Plus className="size-4" /> {triggerLabel}
         </button>
       </DialogTrigger>
-      <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base font-semibold">
-            <span className="flex size-7 items-center justify-center rounded-md bg-gradient-primary text-primary-foreground">
-              <Wallet className="size-3.5" />
-            </span>
-            Add expense
-          </DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        <form key={formKey} action={action} className="grid gap-3">
+        <form key={formKey} action={action} className="grid gap-4">
           {state?.error && <ErrorBanner message={state.error} />}
-          <ExpenseFormFields trips={trips} defaultCurrency={defaultCurrency} />
+          <ExpenseFormFields trips={trips} defaultCurrency={defaultCurrency} expense={defaults} />
           <ExpenseFormFooter onClose={() => setOpen(false)} />
         </form>
       </DialogContent>
@@ -277,7 +303,7 @@ export function EditExpenseDialog({ expense, trips }: { expense: ExpenseDto; tri
         <button
           type="button"
           className={cn(
-            "secondary-button min-h-7 rounded-md px-2.5 py-0.5 text-xs font-semibold",
+            "secondary-button button-sm",
             rejected && "text-rose-700 dark:text-rose-300"
           )}
         >
@@ -286,7 +312,7 @@ export function EditExpenseDialog({ expense, trips }: { expense: ExpenseDto; tri
       </DialogTrigger>
       <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle className="text-base font-semibold">{rejected ? "Fix and resubmit" : "Edit expense"}</DialogTitle>
+          <DialogTitle>{rejected ? "Fix and resubmit" : "Edit expense"}</DialogTitle>
         </DialogHeader>
         <form action={action} className="grid gap-3">
           <input type="hidden" name="id" value={expense.id} />
@@ -335,12 +361,12 @@ export function DeleteExpenseButton({ expenseId, tripId }: { expenseId: string; 
         title="Delete this expense?"
         description="It will be removed from your expenses. Submitted expenses can't be deleted."
         confirmLabel="Delete"
-        confirmClassName="secondary-button rounded-lg text-sm text-rose-600 dark:text-rose-400"
+        confirmClassName="secondary-button text-rose-600 dark:text-rose-400"
       >
         <form action={action}>
           <input type="hidden" name="id" value={expenseId} />
           {tripId && <input type="hidden" name="tripId" value={tripId} />}
-          <SubmitButton pendingText="Deleting…" className="secondary-button rounded-lg text-sm text-rose-600 dark:text-rose-400">
+          <SubmitButton pendingText="Deleting…" className="secondary-button text-rose-600 dark:text-rose-400">
             Delete
           </SubmitButton>
         </form>
@@ -364,7 +390,7 @@ export function SubmitDraftsButton({ draftIds }: { draftIds: string[] }) {
   return (
     <form action={action}>
       {draftIds.map((id) => <input key={id} type="hidden" name="ids" value={id} />)}
-      <SubmitButton pendingText="Submitting…" className="primary-button min-h-8 rounded-md px-3 text-xs">
+      <SubmitButton pendingText="Submitting…" className="primary-button button-sm">
         <Send className="size-3.5" /> Submit all {draftIds.length}
       </SubmitButton>
     </form>
@@ -389,33 +415,28 @@ export function InviteMemberDialog({ compact }: { compact?: boolean } = {}) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {compact ? (
-          <button className="secondary-button rounded-md text-sm">
+          <button className="secondary-button">
             <UserPlus className="size-4" /> Invite
           </button>
         ) : (
-          <button className="primary-button rounded-lg text-sm">
+          <button className="primary-button">
             <Plus className="size-4" /> Invite member
           </button>
         )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base font-semibold">
-            <span className="flex size-7 items-center justify-center rounded-md bg-gradient-primary text-primary-foreground">
-              <Users className="size-3.5" />
-            </span>
-            Invite member
-          </DialogTitle>
+          <DialogTitle>Invite member</DialogTitle>
         </DialogHeader>
         <form action={action} className="grid gap-3">
           {state?.error && <ErrorBanner message={state.error} />}
-          <label className="grid gap-1 text-sm font-medium">
+          <label className="field">
             Email address
-            <input name="email" type="email" required placeholder="colleague@company.com" className="form-control font-normal" />
+            <input name="email" type="email" required placeholder="colleague@company.com" className="form-control" />
           </label>
-          <label className="grid gap-1 text-sm font-medium">
+          <label className="field">
             Role
-            <select name="role" className="form-control font-normal">
+            <select name="role" className="form-control">
               <option value="traveler">Traveler</option>
               <option value="manager">Manager</option>
               <option value="admin">Admin</option>
@@ -446,24 +467,19 @@ export function CreateTeamDialog() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button className="secondary-button rounded-lg text-sm">
+        <button className="secondary-button">
           <Plus className="size-4" /> New team
         </button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base font-semibold">
-            <span className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
-              <Shield className="size-3.5" />
-            </span>
-            New team
-          </DialogTitle>
+          <DialogTitle>New team</DialogTitle>
         </DialogHeader>
         <form action={action} className="grid gap-3">
           {state?.error && <ErrorBanner message={state.error} />}
-          <label className="grid gap-1 text-sm font-medium">
+          <label className="field">
             Team name
-            <input name="name" required placeholder="e.g. Engineering" className="form-control font-normal" />
+            <input name="name" required placeholder="e.g. Engineering" className="form-control" />
           </label>
           <DialogFooterRow onClose={() => setOpen(false)} />
         </form>
@@ -495,33 +511,28 @@ export function AddToTeamDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button className="secondary-button rounded-lg text-sm">
+        <button className="secondary-button">
           <UserPlus className="size-4" /> Assign to team
         </button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base font-semibold">
-            <span className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
-              <UserPlus className="size-3.5" />
-            </span>
-            Assign to team
-          </DialogTitle>
+          <DialogTitle>Assign to team</DialogTitle>
         </DialogHeader>
         <form action={action} className="grid gap-3">
           {state?.error && <ErrorBanner message={state.error} />}
-          <label className="grid gap-1 text-sm font-medium">
+          <label className="field">
             Member
-            <select name="userId" required className="form-control font-normal">
+            <select name="userId" required className="form-control">
               <option value="">Select member…</option>
               {members.map((m) => (
                 <option key={m.userId} value={m.userId}>{m.name} · {m.role}</option>
               ))}
             </select>
           </label>
-          <label className="grid gap-1 text-sm font-medium">
+          <label className="field">
             Team
-            <select name="teamId" required className="form-control font-normal">
+            <select name="teamId" required className="form-control">
               <option value="">Select team…</option>
               {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
@@ -558,18 +569,13 @@ export function AssignTravelersDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button className="secondary-button rounded-md text-sm">
+        <button className="secondary-button">
           <UserPlus className="size-4" /> Edit travelers
         </button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base font-semibold">
-            <span className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
-              <Users className="size-3.5" />
-            </span>
-            Assign travelers
-          </DialogTitle>
+          <DialogTitle>Assign travelers</DialogTitle>
         </DialogHeader>
         <form action={action} className="grid gap-3">
           {state?.error && <ErrorBanner message={state.error} />}
@@ -579,15 +585,16 @@ export function AssignTravelersDialog({
           ) : (
             <div className="grid gap-2 sm:grid-cols-2">
               {travelers.map((t) => (
-                <label key={t.userId} className="traveler-check">
+                <label key={t.userId} className="flex cursor-pointer items-center gap-3 rounded-lg border border-border p-2.5 transition-colors hover:bg-muted has-[:checked]:border-primary/45 has-[:checked]:bg-accent/60">
                   <input
                     type="checkbox"
                     name="travelerUserIds"
                     value={t.userId}
                     defaultChecked={assignedIds.includes(t.userId)}
+                    className="checkbox"
                   />
-                  <span className="traveler-avatar">{t.name[0]?.toUpperCase()}</span>
-                  <span className="min-w-0 truncate text-sm">{t.name}</span>
+                  <span className="avatar size-7 text-xs">{t.name[0]?.toUpperCase()}</span>
+                  <span className="min-w-0 truncate text-sm font-medium">{t.name}</span>
                 </label>
               ))}
             </div>
@@ -595,7 +602,7 @@ export function AssignTravelersDialog({
           {travelers.length > 0 && <DialogFooterRow onClose={() => setOpen(false)} />}
           {travelers.length === 0 && (
             <div className="flex justify-end">
-              <button type="button" className="secondary-button rounded-lg text-sm" onClick={() => setOpen(false)}>Close</button>
+              <button type="button" className="secondary-button" onClick={() => setOpen(false)}>Close</button>
             </div>
           )}
         </form>
@@ -621,29 +628,24 @@ export function RequestApprovalDialog({ tripId }: { tripId: string }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <button className="primary-button rounded-md text-sm">
+        <button className="primary-button">
           <Send className="size-4" /> Request approval
         </button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base font-semibold">
-            <span className="flex size-7 items-center justify-center rounded-md bg-gradient-primary text-primary-foreground">
-              <Send className="size-3.5" />
-            </span>
-            Request travel approval
-          </DialogTitle>
+          <DialogTitle>Request travel approval</DialogTitle>
         </DialogHeader>
         <form action={action} className="grid gap-3">
           {state?.error && <ErrorBanner message={state.error} />}
           <input type="hidden" name="tripId" value={tripId} />
-          <label className="grid gap-1 text-sm font-medium">
+          <label className="field">
             Purpose of travel
-            <input name="purpose" placeholder="Client meeting, conference, etc." className="form-control font-normal" />
+            <input name="purpose" placeholder="Client meeting, conference, etc." className="form-control" />
           </label>
-          <label className="grid gap-1 text-sm font-medium">
+          <label className="field">
             Notes for approver
-            <textarea name="notes" placeholder="Any relevant details…" className="form-control min-h-16 font-normal" />
+            <textarea name="notes" placeholder="Any relevant details…" className="form-control min-h-16" />
           </label>
           <DialogFooterRow onClose={() => setOpen(false)} />
         </form>
@@ -675,14 +677,14 @@ export function ReviewApprovalButtons({ approvalId }: { approvalId: string }) {
       <button
         type="button"
         onClick={() => setConfirmOpen("approve")}
-        className="secondary-button min-h-7 rounded-md px-2.5 py-0.5 text-xs font-semibold text-teal-700 dark:text-teal-400"
+        className="secondary-button button-sm text-teal-700 dark:text-teal-400"
       >
         <Check className="size-3.5" /> Approve
       </button>
       <button
         type="button"
         onClick={() => setConfirmOpen("reject")}
-        className="secondary-button min-h-7 rounded-md px-2.5 py-0.5 text-xs font-semibold text-rose-600 dark:text-rose-400"
+        className="secondary-button button-sm text-rose-600 dark:text-rose-400"
       >
         <X className="size-3.5" /> Reject
       </button>
@@ -693,12 +695,12 @@ export function ReviewApprovalButtons({ approvalId }: { approvalId: string }) {
         title="Approve this request?"
         description="The traveler will be notified that their trip request is approved."
         confirmLabel="Approve"
-        confirmClassName="primary-button rounded-lg text-sm"
+        confirmClassName="primary-button"
       >
         <form action={approveAction}>
           <input type="hidden" name="id" value={approvalId} />
           <input type="hidden" name="status" value="approved" />
-          <SubmitButton pendingText="Approving…" className="primary-button rounded-lg text-sm">
+          <SubmitButton pendingText="Approving…" className="primary-button">
             Approve
           </SubmitButton>
         </form>
@@ -710,12 +712,12 @@ export function ReviewApprovalButtons({ approvalId }: { approvalId: string }) {
         title="Reject this request?"
         description="The traveler will be notified that their trip request has been rejected."
         confirmLabel="Reject"
-        confirmClassName="secondary-button rounded-lg text-sm text-rose-600 dark:text-rose-400"
+        confirmClassName="secondary-button text-rose-600 dark:text-rose-400"
       >
         <form action={rejectAction}>
           <input type="hidden" name="id" value={approvalId} />
           <input type="hidden" name="status" value="rejected" />
-          <SubmitButton pendingText="Rejecting…" className="secondary-button rounded-lg text-sm text-rose-600 dark:text-rose-400">
+          <SubmitButton pendingText="Rejecting…" className="secondary-button text-rose-600 dark:text-rose-400">
             Reject
           </SubmitButton>
         </form>
@@ -751,14 +753,14 @@ export function BulkApproveButtons({ approvalIds }: { approvalIds: string[] }) {
       <button
         type="button"
         onClick={() => setConfirmOpen("approve")}
-        className="secondary-button min-h-7 rounded-md px-2.5 py-0.5 text-xs font-semibold text-teal-700 dark:text-teal-400"
+        className="secondary-button button-sm text-teal-700 dark:text-teal-400"
       >
         <Check className="size-3.5" /> Approve all
       </button>
       <button
         type="button"
         onClick={() => setConfirmOpen("reject")}
-        className="secondary-button min-h-7 rounded-md px-2.5 py-0.5 text-xs font-semibold text-rose-600 dark:text-rose-400"
+        className="secondary-button button-sm text-rose-600 dark:text-rose-400"
       >
         <X className="size-3.5" /> Reject all
       </button>
@@ -769,12 +771,12 @@ export function BulkApproveButtons({ approvalIds }: { approvalIds: string[] }) {
         title={`Approve ${n} request${n !== 1 ? "s" : ""}?`}
         description="All selected travelers will be notified that their trip requests are approved."
         confirmLabel="Approve all"
-        confirmClassName="primary-button rounded-lg text-sm"
+        confirmClassName="primary-button"
       >
         <form action={approveAction}>
           {approvalIds.map((id) => <input key={id} type="hidden" name="ids" value={id} />)}
           <input type="hidden" name="status" value="approved" />
-          <SubmitButton pendingText="Approving…" className="primary-button rounded-lg text-sm">
+          <SubmitButton pendingText="Approving…" className="primary-button">
             Approve all
           </SubmitButton>
         </form>
@@ -786,12 +788,12 @@ export function BulkApproveButtons({ approvalIds }: { approvalIds: string[] }) {
         title={`Reject ${n} request${n !== 1 ? "s" : ""}?`}
         description="All selected travelers will be notified that their trip requests have been rejected."
         confirmLabel="Reject all"
-        confirmClassName="secondary-button rounded-lg text-sm text-rose-600 dark:text-rose-400"
+        confirmClassName="secondary-button text-rose-600 dark:text-rose-400"
       >
         <form action={rejectAction}>
           {approvalIds.map((id) => <input key={id} type="hidden" name="ids" value={id} />)}
           <input type="hidden" name="status" value="rejected" />
-          <SubmitButton pendingText="Rejecting…" className="secondary-button rounded-lg text-sm text-rose-600 dark:text-rose-400">
+          <SubmitButton pendingText="Rejecting…" className="secondary-button text-rose-600 dark:text-rose-400">
             Reject all
           </SubmitButton>
         </form>
@@ -820,7 +822,7 @@ export function SubmitExpenseButton({ expenseId, tripId }: { expenseId: string; 
       <button
         type="button"
         onClick={() => setConfirmOpen(true)}
-        className="secondary-button min-h-7 rounded-md px-2.5 py-0.5 text-xs font-semibold text-blue-700 dark:text-blue-400"
+        className="secondary-button button-sm text-blue-700 dark:text-blue-400"
       >
         <Send className="size-3.5" /> Submit
       </button>
@@ -831,12 +833,12 @@ export function SubmitExpenseButton({ expenseId, tripId }: { expenseId: string; 
         title="Submit this expense?"
         description="This expense will be sent to your admin for review. You won't be able to edit it after submission."
         confirmLabel="Submit"
-        confirmClassName="primary-button rounded-lg text-sm"
+        confirmClassName="primary-button"
       >
         <form action={action}>
           <input type="hidden" name="id" value={expenseId} />
           {tripId && <input type="hidden" name="tripId" value={tripId} />}
-          <SubmitButton pendingText="Submitting…" className="primary-button rounded-lg text-sm">
+          <SubmitButton pendingText="Submitting…" className="primary-button">
             Submit
           </SubmitButton>
         </form>
@@ -875,25 +877,28 @@ export function ReviewExpenseButtons({
           <button
             type="button"
             onClick={() => setOpen("approved")}
-            className="secondary-button min-h-7 rounded-md px-2 py-0.5 text-xs text-teal-700 dark:text-teal-400"
+            aria-label="Approve"
+            className="secondary-button button-sm text-teal-700 dark:text-teal-400"
           >
-            <Check className="size-3.5" /> Approve
+            <Check className="size-3.5" /> <span className="hidden sm:inline">Approve</span>
           </button>
           <button
             type="button"
             onClick={() => setOpen("rejected")}
-            className="secondary-button min-h-7 rounded-md px-2 py-0.5 text-xs text-rose-600 dark:text-rose-400"
+            aria-label="Send back"
+            className="secondary-button button-sm text-rose-600 dark:text-rose-400"
           >
-            <X className="size-3.5" /> Send back
+            <X className="size-3.5" /> <span className="hidden sm:inline">Send back</span>
           </button>
         </>
       ) : (
         <button
           type="button"
           onClick={() => setOpen("reimbursed")}
-          className="secondary-button min-h-7 rounded-md px-2 py-0.5 text-xs text-emerald-700 dark:text-emerald-400"
+          aria-label="Mark paid"
+          className="secondary-button button-sm text-emerald-700 dark:text-emerald-400"
         >
-          <Banknote className="size-3.5" /> Mark paid
+          <Banknote className="size-3.5" /> <span className="hidden sm:inline">Mark paid</span>
         </button>
       )}
 
@@ -958,14 +963,14 @@ export function ReviewDialog({
         {copy && open && (
           <>
             <DialogHeader>
-              <DialogTitle className="text-base font-semibold">{copy.title(count)}</DialogTitle>
+              <DialogTitle>{copy.title(count)}</DialogTitle>
             </DialogHeader>
             <form action={action} className="grid gap-3">
               {children}
               <input type="hidden" name="status" value={open} />
               <p className="text-sm text-muted-foreground">{copy.body}</p>
               {copy.noteLabel && (
-                <label className="grid gap-1 text-sm font-medium">
+                <label className="field">
                   {copy.noteLabel}
                   <textarea
                     name="notes"
@@ -974,20 +979,20 @@ export function ReviewDialog({
                     maxLength={1000}
                     autoFocus={open === "rejected"}
                     placeholder={open === "rejected" ? "e.g. Please attach the itemised hotel folio" : ""}
-                    className="form-control min-h-16 font-normal"
+                    className="form-control min-h-16"
                   />
                 </label>
               )}
               {error && <ErrorBanner message={error} />}
               <div className="flex justify-end gap-2 pt-1">
-                <button type="button" className="secondary-button rounded-lg text-sm" onClick={onClose}>
+                <button type="button" className="secondary-button" onClick={onClose}>
                   Cancel
                 </button>
                 <SubmitButton
                   pendingText={copy.pending}
                   className={open === "rejected"
-                    ? "secondary-button rounded-lg text-sm text-rose-600 dark:text-rose-400"
-                    : "primary-button rounded-lg text-sm"}
+                    ? "secondary-button text-rose-600 dark:text-rose-400"
+                    : "primary-button"}
                 >
                   {copy.label}
                 </SubmitButton>

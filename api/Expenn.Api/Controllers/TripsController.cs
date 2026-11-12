@@ -1,7 +1,9 @@
 using Expenn.Api.Application.Common;
+using Expenn.Api.Application.Travel;
 using Expenn.Api.Data;
 using Expenn.Api.Data.Entities;
 using Expenn.Api.Domain.Events;
+using Expenn.Api.Domain.Travel;
 using Expenn.Api.DTOs.Trips;
 using MassTransit;
 using Microsoft.AspNetCore.Authorization;
@@ -39,10 +41,21 @@ public class TripsController(
             query = query.Where(t => t.TeamId != null && managedTeamIds.Contains(t.TeamId));
         }
 
-        return Ok(await query
+        // Project only the columns a list needs: the full route geometry stays in the database.
+        var trips = await query
             .OrderBy(t => t.StartDate)
-            .Select(t => ToDto(t))
-            .ToListAsync(ct));
+            .Select(t => new Trip
+            {
+                Id = t.Id, OrganizationId = t.OrganizationId, TeamId = t.TeamId, Name = t.Name,
+                Destination = t.Destination, StartDate = t.StartDate, EndDate = t.EndDate, Budget = t.Budget,
+                Currency = t.Currency, Status = t.Status, CreatedAt = t.CreatedAt, UpdatedAt = t.UpdatedAt,
+                RouteDistanceMeters = t.RouteDistanceMeters, RouteDurationSeconds = t.RouteDurationSeconds,
+                RoutePreview = t.RoutePreview,
+            })
+            .ToListAsync(ct);
+
+        var stops = await LoadStopPointsAsync(trips.Select(t => t.Id).ToList(), ct);
+        return Ok(trips.Select(t => ToDto(t, stops.GetValueOrDefault(t.Id))).ToList());
     }
 
     // ── Get trip by ID ────────────────────────────────────────────────────────
@@ -55,16 +68,17 @@ public class TripsController(
             .FirstOrDefaultAsync(t => t.Id == id && t.OrganizationId == currentUser.OrgId && t.DeletedAt == null, ct);
 
         if (trip is null) return NotFound();
-        if (currentUser.IsAdmin) return Ok(ToDto(trip));
 
-        if (currentUser.Role == "manager")
+        var allowed = currentUser.IsAdmin || trip.Travelers.Any(tt => tt.UserId == currentUser.UserId);
+        if (!allowed && currentUser.Role == "manager")
         {
             var managed = await GetManagedTeamIdsAsync(ct);
-            if (trip.TeamId != null && managed.Contains(trip.TeamId)) return Ok(ToDto(trip));
+            allowed = trip.TeamId != null && managed.Contains(trip.TeamId);
         }
+        if (!allowed) return Forbid();
 
-        if (!trip.Travelers.Any(tt => tt.UserId == currentUser.UserId)) return Forbid();
-        return Ok(ToDto(trip));
+        var stops = await LoadStopPointsAsync([trip.Id], ct);
+        return Ok(ToDto(trip, stops.GetValueOrDefault(trip.Id)));
     }
 
     // ── Create trip ───────────────────────────────────────────────────────────
@@ -72,14 +86,22 @@ public class TripsController(
     [HttpPost]
     public async Task<ActionResult<TripDto>> Create([FromBody] CreateTripRequest req, CancellationToken ct)
     {
-        if (!currentUser.IsManager) return Forbid();
+        // In a personal workspace the traveler plans their own trips; company trips are created by managers.
+        var isPersonal = await db.Organizations.AnyAsync(o => o.Id == currentUser.OrgId && o.AccountType == "personal", ct);
+        if (!currentUser.IsManager && !isPersonal) return Forbid();
+
+        if (string.IsNullOrWhiteSpace(req.Name) || string.IsNullOrWhiteSpace(req.Destination))
+            return BadRequest(new { error = "Give the trip a name and a destination" });
 
         if (!DateTime.TryParse(req.StartDate, out var start) || !DateTime.TryParse(req.EndDate, out var end))
             return BadRequest(new { error = "Invalid date format" });
 
         if (end < start) return BadRequest(new { error = "End date must be after the start date" });
+        if (req.Budget < 0) return BadRequest(new { error = "Budget can't be negative" });
 
-        var team = await db.Teams.FirstOrDefaultAsync(t => t.Id == req.TeamId && t.OrganizationId == currentUser.OrgId, ct);
+        var team = string.IsNullOrEmpty(req.TeamId) && isPersonal
+            ? await db.Teams.Where(t => t.OrganizationId == currentUser.OrgId).OrderBy(t => t.CreatedAt).FirstOrDefaultAsync(ct)
+            : await db.Teams.FirstOrDefaultAsync(t => t.Id == req.TeamId && t.OrganizationId == currentUser.OrgId, ct);
         if (team is null) return BadRequest(new { error = "Select a valid team before creating a trip" });
 
         if (currentUser.Role == "manager")
@@ -104,9 +126,14 @@ public class TripsController(
         await db.SaveChangesAsync(ct);
 
         var travelerIds = (req.TravelerUserIds ?? []).Distinct().Where(x => !string.IsNullOrEmpty(x)).ToList();
+        if (isPersonal && !travelerIds.Contains(currentUser.UserId)) travelerIds.Add(currentUser.UserId);
         if (travelerIds.Count > 0)
         {
-            var validUsers = await db.Users.Where(u => travelerIds.Contains(u.Id)).Select(u => u.Id).ToListAsync(ct);
+            // Only members of this workspace can be assigned.
+            var validUsers = await db.Members
+                .Where(m => m.OrganizationId == currentUser.OrgId && travelerIds.Contains(m.UserId))
+                .Select(m => m.UserId)
+                .ToListAsync(ct);
             db.TripTravelers.AddRange(validUsers.Select(uid => new TripTraveler
             {
                 OrganizationId = currentUser.OrgId,
@@ -116,7 +143,7 @@ public class TripsController(
             await db.SaveChangesAsync(ct);
         }
 
-        return CreatedAtAction(nameof(GetById), new { id = trip.Id }, ToDto(trip));
+        return CreatedAtAction(nameof(GetById), new { id = trip.Id }, ToDto(trip, stops: null));
     }
 
     // ── Travelers ─────────────────────────────────────────────────────────────
@@ -187,7 +214,8 @@ public class TripsController(
         trip.UpdatedAt = DateTimeOffset.UtcNow;
         await db.SaveChangesAsync(ct);
 
-        return Ok(ToDto(trip));
+        var stops = await LoadStopPointsAsync([trip.Id], ct);
+        return Ok(ToDto(trip, stops.GetValueOrDefault(trip.Id)));
     }
 
     // ── Approvals ─────────────────────────────────────────────────────────────
@@ -316,7 +344,30 @@ public class TripsController(
             .Select(tm => tm.TeamId)
             .ToListAsync(ct);
 
-    private static TripDto ToDto(Trip t) => new(
-        t.Id, t.OrganizationId, t.TeamId, t.Name, t.Destination,
-        t.StartDate, t.EndDate, t.Budget, t.Currency, t.Status, t.CreatedAt, t.UpdatedAt);
+    private sealed record StopPoint(string TripId, string Name, double Longitude, double Latitude);
+
+    /// <summary>One query for the stops of all listed trips, grouped per trip in position order.</summary>
+    private async Task<Dictionary<string, List<StopPoint>>> LoadStopPointsAsync(List<string> tripIds, CancellationToken ct)
+    {
+        if (tripIds.Count == 0) return [];
+        var points = await db.TripStops
+            .Where(s => tripIds.Contains(s.TripId))
+            .OrderBy(s => s.TripId).ThenBy(s => s.Position)
+            .Select(s => new StopPoint(s.TripId, s.Name, s.Longitude, s.Latitude))
+            .ToListAsync(ct);
+        return points.GroupBy(p => p.TripId).ToDictionary(g => g.Key, g => g.ToList());
+    }
+
+    private static TripDto ToDto(Trip t, List<StopPoint>? stops)
+    {
+        stops ??= [];
+        var preview = TripRouteStore.ReadPreview(t.RoutePreview)
+            ?? (stops.Count >= 2 ? stops.Select(s => new[] { s.Longitude, s.Latitude }).ToList() : null);
+
+        return new TripDto(
+            t.Id, t.OrganizationId, t.TeamId, t.Name, t.Destination,
+            t.StartDate, t.EndDate, t.Budget, t.Currency, t.Status, t.CreatedAt, t.UpdatedAt,
+            stops.Count, t.RouteDistanceMeters, t.RouteDurationSeconds,
+            TripItinerary.Summarize(stops.Select(s => s.Name).ToList()), preview);
+    }
 }

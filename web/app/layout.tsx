@@ -1,4 +1,7 @@
 import { RootProvider } from 'fumadocs-ui/provider/next';
+import '@fontsource-variable/inter';
+import '@fontsource-variable/bricolage-grotesque';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import './global.css';
 import { Suspense } from 'react';
 import type { Metadata } from 'next';
