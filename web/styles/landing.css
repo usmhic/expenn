@@ -277,7 +277,7 @@
 
   /* ── Header ─────────────────────────────────────────────────────────────── */
   .lp-header {
-    background: color-mix(in oklab, var(--canvas) 78%, transparent);
+    background: color-mix(in oklab, var(--canvas) 92%, transparent);
     backdrop-filter: blur(18px) saturate(160%);
     -webkit-backdrop-filter: blur(18px) saturate(160%);
   }
