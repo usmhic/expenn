@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator, RefreshControl, ScrollView, StyleSheet,
+  ActivityIndicator, Linking, RefreshControl, ScrollView, StyleSheet,
   Text, TouchableOpacity, View,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -16,6 +16,40 @@ import { radius, scale, shadow, spacing, statusStyle, typography } from '../../c
 
 type Trip = Awaited<ReturnType<typeof tripsApi.getById>>;
 type Expense = Awaited<ReturnType<typeof expensesApi.list>>[number];
+type Itinerary = Awaited<ReturnType<typeof tripsApi.getItinerary>>;
+
+const PROFILE_LABEL: Record<string, string> = {
+  'driving-car': 'by car', 'driving-hgv': 'by van', 'cycling-regular': 'by bike', 'foot-walking': 'on foot',
+};
+const KIND_LABEL: Record<string, string> = { stay: 'Overnight stay', meeting: 'Meeting', transit: 'Transit', stop: '' };
+
+function fmtDistance(m: number) {
+  return m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(m >= 100000 ? 0 : 1)} km`;
+}
+
+function fmtDuration(sec: number) {
+  const min = Math.round(sec / 60);
+  if (min < 60) return `${Math.max(1, min)} min`;
+  const h = Math.floor(min / 60);
+  return min % 60 ? `${h} h ${min % 60} min` : `${h} h`;
+}
+
+function shortDay(iso?: string) {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(y, m - 1, d)));
+}
+
+/** Hands the planned stops to the phone's maps app for turn-by-turn navigation. */
+function openInMaps(itinerary: Itinerary) {
+  const pts = itinerary.stops.map((st) => `${st.latitude},${st.longitude}`);
+  if (pts.length === 0) return;
+  const mode = itinerary.profile.startsWith('cycling') ? 'bicycling' : itinerary.profile.startsWith('foot') ? 'walking' : 'driving';
+  const params = new URLSearchParams({ api: '1', destination: pts[pts.length - 1], travelmode: mode });
+  if (pts.length > 1) params.set('origin', pts[0]);
+  if (pts.length > 2) params.set('waypoints', pts.slice(1, -1).join('|'));
+  Linking.openURL(`https://www.google.com/maps/dir/?${params.toString()}`).catch(() => {});
+}
 
 function tripProgress(trip: Trip): { label: string; kind: 'upcoming' | 'active' | 'ended'; pct: number } {
   const now = Date.now();
@@ -42,6 +76,7 @@ export default function TripDetailScreen() {
   const { session } = useAuth();
   const [trip, setTrip] = useState<Trip | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [itinerary, setItinerary] = useState<Itinerary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -51,12 +86,14 @@ export default function TripDetailScreen() {
     if (!id) return;
     setError('');
     try {
-      const [tripData, expenseData] = await Promise.all([
+      const [tripData, expenseData, itineraryData] = await Promise.all([
         tripsApi.getById(id),
         expensesApi.list({ tripId: id, mine: true }),
+        tripsApi.getItinerary(id).catch(() => null),
       ]);
       setTrip(tripData);
       setExpenses(expenseData);
+      setItinerary(itineraryData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load trip.');
     } finally {
@@ -196,6 +233,50 @@ export default function TripDetailScreen() {
             )}
           </View>
 
+          {/* Itinerary — planned on the web, followed on the road */}
+          {itinerary && itinerary.stops.length > 0 && (
+            <View style={[s.itineraryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={s.sectionHeader}>
+                <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>Itinerary</Text>
+                <TouchableOpacity onPress={() => openInMaps(itinerary)} style={[s.mapsBtn, { backgroundColor: colors.accentDim }]}>
+                  <MapPinIcon color={colors.accent} size={14} />
+                  <Text style={[s.mapsBtnText, { color: colors.accent }]}>Open in Maps</Text>
+                </TouchableOpacity>
+              </View>
+              {itinerary.route && (
+                <Text style={[s.routeTotal, { color: colors.textPrimary }]}>
+                  {fmtDistance(itinerary.route.distanceMeters)} · {fmtDuration(itinerary.route.durationSeconds)}
+                  <Text style={{ color: colors.textSecondary }}> {PROFILE_LABEL[itinerary.profile] ?? ''}</Text>
+                </Text>
+              )}
+              {itinerary.stops.map((stop, index) => {
+                const leg = itinerary.route?.legs[index];
+                const dates = [shortDay(stop.arriveOn), shortDay(stop.departOn)].filter(Boolean).join(' → ');
+                const meta = [KIND_LABEL[stop.kind], dates || stop.address].filter(Boolean).join(' · ');
+                return (
+                  <View key={stop.id}>
+                    <View style={s.stopRow}>
+                      <View style={[s.stopDot, { backgroundColor: stop.kind === 'stay' ? '#0d9488' : stop.kind === 'meeting' ? '#ea7317' : colors.accent }]}>
+                        <Text style={s.stopDotText}>{index + 1}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[s.stopName, { color: colors.textPrimary }]} numberOfLines={1}>{stop.name}</Text>
+                        {meta ? <Text style={[s.stopMeta, { color: colors.textSecondary }]} numberOfLines={1}>{meta}</Text> : null}
+                        {stop.notes ? <Text style={[s.stopMeta, { color: colors.textSecondary }]} numberOfLines={2}>{stop.notes}</Text> : null}
+                      </View>
+                    </View>
+                    {index < itinerary.stops.length - 1 && (
+                      <View style={s.legRow}>
+                        <View style={[s.legLine, { borderColor: colors.border }]} />
+                        {leg ? <Text style={[s.legText, { color: colors.textSecondary }]}>{fmtDistance(leg.distanceMeters)} · {fmtDuration(leg.durationSeconds)}</Text> : null}
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
           {/* Expenses section */}
           <View style={s.section}>
             <View style={s.sectionHeader}>
@@ -318,6 +399,18 @@ const s = StyleSheet.create({
   // Expenses
   section: { gap: spacing.sm },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  itineraryCard: { borderWidth: 1, borderRadius: radius.xl, padding: spacing.md, gap: spacing.sm },
+  mapsBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 6 },
+  mapsBtnText: { fontFamily: 'Inter-Bold', fontSize: typography.xs },
+  routeTotal: { fontFamily: 'Inter-Bold', fontSize: typography.md },
+  stopRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  stopDot: { width: scale(26), height: scale(26), borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  stopDotText: { color: '#fff', fontFamily: 'Inter-Bold', fontSize: typography.xs },
+  stopName: { fontFamily: 'Inter-Bold', fontSize: typography.base },
+  stopMeta: { fontFamily: 'Inter-Regular', fontSize: typography.sm, marginTop: 1 },
+  legRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingLeft: scale(12), minHeight: scale(22) },
+  legLine: { height: scale(22), borderLeftWidth: 2, borderStyle: 'dashed' },
+  legText: { fontFamily: 'Inter-Regular', fontSize: typography.xs },
   sectionTitle: { fontFamily: 'Inter-Bold', fontSize: typography.md },
   addBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: radius.md, paddingHorizontal: spacing.sm, paddingVertical: 6 },
   addBtnText: { fontFamily: 'Inter-Bold', fontSize: typography.sm },

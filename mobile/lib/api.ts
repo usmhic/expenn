@@ -114,6 +114,7 @@ export const trips = {
   updateStatus: (id: string, status: string) => patch<TripDto>(`/api/trips/${id}/status`, { status }),
 
   getTravelers: (tripId: string) => get<TripTravelerDto[]>(`/api/trips/${tripId}/travelers`),
+  getItinerary: (tripId: string) => get<ItineraryDto>(`/api/trips/${tripId}/itinerary`),
   assignTravelers: (tripId: string, travelerUserIds: string[]) =>
     put(`/api/trips/${tripId}/travelers`, { travelerUserIds }),
 
@@ -291,6 +292,29 @@ export interface TeamMemberDto {
   userId: string;
   name: string;
   email: string;
+}
+
+export interface TripStopDto {
+  id: string;
+  position: number;
+  name: string;
+  address?: string;
+  latitude: number;
+  longitude: number;
+  /** yyyy-MM-dd */
+  arriveOn?: string;
+  departOn?: string;
+  notes?: string;
+  kind: 'stop' | 'stay' | 'meeting' | 'transit';
+}
+
+export interface ItineraryDto {
+  tripId: string;
+  profile: 'driving-car' | 'driving-hgv' | 'cycling-regular' | 'foot-walking';
+  stops: TripStopDto[];
+  route?: { distanceMeters: number; durationSeconds: number; legs: { distanceMeters: number; durationSeconds: number }[] } | null;
+  routingEnabled: boolean;
+  routeError?: string;
 }
 
 export interface TripDto {
