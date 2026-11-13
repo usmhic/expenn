@@ -15,11 +15,11 @@ The workspace uses distinct ports so all three products can run together:
 
 Database and storage usernames match the product (`skaddosh`, `expenn`, or
 `freesolo`). Read their passwords from your local `.env`. Expenn uses the same
-`JWT_SECRET` / `Jwt__Secret`, `MINIO_PASSWORD` / `Storage__SecretKey`, and
-`RABBITMQ_PASSWORD` / `RabbitMq__Password`; FreeSolo uses the same
+`JWT_SECRET` / `Jwt__Secret` and `MINIO_PASSWORD` / `Storage__SecretKey`, and
+`ConnectionStrings__DefaultConnection` must use `POSTGRES_PASSWORD`; FreeSolo uses the same
 `MINIO_PASSWORD` / `MINIO_SECRET_KEY`. Keep each pair synchronized.
 
-`DATABASE_URL` points to the host database for native development. Compose maps
+`ConnectionStrings__DefaultConnection` points to the host database for native development. Compose maps
 the same credentials to its internal service names. Port settings control host
 bindings; public URLs must also reflect any port changes. The apps do not invent
 credentials for OAuth, billing, AI, email, or store services: configure your own
@@ -53,8 +53,8 @@ port is separate from the API's `PORT`.
 
 Place search, routes and stop optimisation call [OpenRouteService](https://openrouteservice.org).
 Create a free API key and set `OpenRouteService__ApiKey` in `.env`; without it the planner still
-lets you pin stops on the map but won't calculate routes. Map tiles default to OpenFreeMap
-(`NEXT_PUBLIC_MAP_STYLE_URL`, `NEXT_PUBLIC_MAP_STYLE_URL_DARK`).
+lets you pin stops on the map but won't calculate routes. Map tiles default to OpenFreeMap; add
+`NEXT_PUBLIC_MAP_STYLE_URL` and `NEXT_PUBLIC_MAP_STYLE_URL_DARK` to `.env` to override them.
 
 ## Brand assets
 
