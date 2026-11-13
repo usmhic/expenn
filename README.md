@@ -93,12 +93,12 @@ RabbitMQ, the API, and the web app, and creates the object-storage bucket automa
 ```bash
 git clone https://github.com/usmhic/expenn.git && cd expenn
 cp .env.example .env       # PowerShell: Copy-Item .env.example .env
-# Fill the secrets marked FILL ME at the bottom of .env, then:
+# Fill the empty values in .env, then:
 docker compose up --build
 ```
 
 `.env.example` already carries working localhost defaults for everything that is not a secret, so
-the only values you need to invent are the passwords and the JWT secret. `.env` is gitignored;
+the only values you need to invent are the passwords, the JWT secret, and the API connection string. `.env` is gitignored;
 never commit it.
 
 ☕ Grab a coffee for the first build, then open:
@@ -108,9 +108,9 @@ never commit it.
 | 🌍 Web | http://localhost:3001 |
 | ⚙️ API | http://localhost:5000 |
 | ❤️ API health | http://localhost:5000/health |
-| 📦 MinIO console | http://localhost:9001 |
+| 📦 MinIO console | http://localhost:9011 |
 | 🐇 RabbitMQ console | http://localhost:15672 |
-| 🐘 PostgreSQL | localhost:5432 |
+| 🐘 PostgreSQL | localhost:5433 |
 
 Useful commands:
 
