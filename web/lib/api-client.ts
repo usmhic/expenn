@@ -160,9 +160,19 @@ function createClient(opts: FetchOptions = {}) {
         get<TripDto[]>('/api/trips', params),
       getById: (id: string) => get<TripDto>(`/api/trips/${id}`),
       create: (body: CreateTripRequest) => post<TripDto>('/api/trips', body),
+      /** Edits details; omitted fields keep their value. */
+      update: (id: string, body: UpdateTripRequest) => put<TripDto>(`/api/trips/${id}`, body),
       updateStatus: (id: string, status: string) => patch<TripDto>(`/api/trips/${id}/status`, { status }),
       getItinerary: (id: string) => get<ItineraryDto>(`/api/trips/${id}/itinerary`),
       saveItinerary: (id: string, body: SaveItineraryRequest) => put<ItineraryDto>(`/api/trips/${id}/itinerary`, body),
+      /** Totals across receipts and bookings without a receipt yet. */
+      getCosts: (id: string) => get<TripCostsDto>(`/api/trips/${id}/costs`),
+
+      getBookings: (tripId: string) => get<TripBookingDto[]>(`/api/trips/${tripId}/bookings`),
+      createBooking: (tripId: string, body: SaveBookingRequest) => post<TripBookingDto>(`/api/trips/${tripId}/bookings`, body),
+      updateBooking: (tripId: string, bookingId: string, body: SaveBookingRequest) =>
+        put<TripBookingDto>(`/api/trips/${tripId}/bookings/${bookingId}`, body),
+      deleteBooking: (tripId: string, bookingId: string) => del(`/api/trips/${tripId}/bookings/${bookingId}`),
 
       getTravelers: (tripId: string) => get<TripTravelerDto[]>(`/api/trips/${tripId}/travelers`),
       assignTravelers: (tripId: string, travelerUserIds: string[]) =>
@@ -340,6 +350,94 @@ export interface TripDto {
   routeSummary?: string | null;
   /** Downsampled route as [lon, lat] pairs, for thumbnails. */
   routePreview?: [number, number][] | null;
+  kind?: TripKind;
+  /** People without an account, e.g. family members. */
+  companions?: string[];
+  travelerCount?: number;
+}
+
+export type TripKind = 'business' | 'personal' | 'family' | 'group';
+export type BookingKind = 'flight' | 'hotel' | 'car' | 'train' | 'bus' | 'ferry' | 'activity' | 'other';
+export type BookingStatus = 'planned' | 'booked' | 'cancelled';
+
+export interface TripBookingDto {
+  id: string;
+  tripId: string;
+  kind: BookingKind;
+  status: BookingStatus;
+  title: string;
+  provider?: string;
+  reference?: string;
+  origin?: string;
+  destination?: string;
+  /** Local wall-clock time, no offset: "2026-11-09T10:15:00". */
+  startsAt?: string;
+  endsAt?: string;
+  amount: number;
+  currency: string;
+  paidBy: 'personal' | 'company';
+  travelers: number;
+  bookingUrl?: string;
+  notes?: string;
+  createdByName?: string;
+  /** The receipt filed against this booking, if any. */
+  expenseId?: string;
+  expenseStatus?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SaveBookingRequest {
+  kind: BookingKind;
+  status?: BookingStatus;
+  title: string;
+  provider?: string;
+  reference?: string;
+  origin?: string;
+  destination?: string;
+  startsAt?: string;
+  endsAt?: string;
+  amount?: number;
+  currency?: string;
+  paidBy?: 'personal' | 'company';
+  travelers?: number;
+  bookingUrl?: string;
+  notes?: string;
+}
+
+export interface CostSliceDto {
+  key: string;
+  label: string;
+  amount: number;
+}
+
+export interface TripCostsDto {
+  currency: string;
+  budget: number;
+  /** Receipts logged on the trip (any status but rejected). */
+  spent: number;
+  /** Confirmed bookings without a receipt yet. */
+  booked: number;
+  /** Planned bookings: estimates, not yet confirmed. */
+  planned: number;
+  total: number;
+  remaining: number;
+  partySize: number;
+  days: number;
+  perPerson: number;
+  perDay: number;
+  paidPersonally: number;
+  paidByCompany: number;
+  reimbursementPending: number;
+  reimbursementOwed: number;
+  reimbursed: number;
+  receiptCount: number;
+  bookingCount: number;
+  bookingsWithoutReceipt: number;
+  byCategory: CostSliceDto[];
+  byPerson: CostSliceDto[];
+  /** Amounts in other currencies; never converted. */
+  otherCurrencies: CostSliceDto[];
 }
 
 export type RouteProfile = 'driving-car' | 'driving-hgv' | 'cycling-regular' | 'foot-walking';
@@ -464,6 +562,8 @@ export interface ExpenseDto {
   /** Reviewer's note — always present on rejected expenses. */
   reviewNote?: string;
   reimbursedAt?: string;
+  /** The trip booking this receipt pays for. */
+  bookingId?: string;
 }
 
 export interface ExpenseListParams {
@@ -590,6 +690,19 @@ export interface CreateTripRequest {
   currency: string;
   status?: string;
   travelerUserIds?: string[];
+  kind?: TripKind;
+  companions?: string[];
+}
+
+export interface UpdateTripRequest {
+  name?: string;
+  destination?: string;
+  startDate?: string;
+  endDate?: string;
+  budget?: number;
+  currency?: string;
+  kind?: TripKind;
+  companions?: string[];
 }
 export interface CreateExpenseRequest {
   tripId?: string;
@@ -602,6 +715,8 @@ export interface CreateExpenseRequest {
   paymentMethod?: string;
   reimbursable?: boolean;
   receiptFileUrl?: string;
+  /** Create only: files the receipt against a booking on the same trip. */
+  bookingId?: string;
 }
 export interface CreateDocumentRequest {
   title: string;

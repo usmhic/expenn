@@ -25,6 +25,88 @@ async function wsPath(role: "admin" | "traveler", path = "") {
 
 export type DialogState = { success?: boolean; error?: string; message?: string; id?: string } | null;
 
+const tripKindSchema = z.enum(["business", "personal", "family", "group"]);
+
+/** "Ana, Ben\nMia" → ["Ana", "Ben", "Mia"] */
+function splitNames(value?: string) {
+  return (value ?? "").split(/[,\n]/).map((n) => n.trim()).filter(Boolean);
+}
+
+async function revalidateTripPaths(tripId: string) {
+  revalidatePath(await wsPath("traveler", `/trips/${tripId}`));
+  revalidatePath(await wsPath("admin", `/trips/${tripId}`));
+  revalidatePath(await wsPath("traveler", "/trips"));
+  revalidatePath(await wsPath("admin", "/trips"));
+}
+
+export async function updateTripDialogAction(_: DialogState, formData: FormData): Promise<DialogState> {
+  try {
+    const input = z.object({
+      id: z.string().min(1),
+      name: z.string().trim().min(2, "Give the trip a name."),
+      destination: z.string().trim().min(2, "Where are you going?"),
+      budget: z.coerce.number().min(0, "Budget can't be negative.").default(0),
+      currency: z.string().trim().min(3).max(5),
+      startDate: z.string().date("Pick a start date."),
+      endDate: z.string().date("Pick an end date."),
+      kind: tripKindSchema,
+      companions: z.string().optional(),
+    }).parse(Object.fromEntries(formData.entries()));
+    if (input.endDate < input.startDate) return { error: "The trip can't end before it starts." };
+    const { id, companions, ...rest } = input;
+    await (await api()).trips.update(id, { ...rest, currency: rest.currency.toUpperCase(), companions: splitNames(companions) });
+    await revalidateTripPaths(id);
+    return { success: true };
+  } catch (e) { return { error: errMsg(e) }; }
+}
+
+const optionalText = z.string().trim().optional().transform((v) => v || undefined);
+/** datetime-local gives "2026-11-09T10:15"; a date input gives "2026-11-09". Both are local times. */
+const localDateTime = z.string().trim().optional().transform((v) => (v ? (v.length === 10 ? `${v}T00:00` : v) : undefined));
+
+export async function saveBookingDialogAction(_: DialogState, formData: FormData): Promise<DialogState> {
+  try {
+    const input = z.object({
+      tripId: z.string().min(1),
+      bookingId: optionalText,
+      kind: z.enum(["flight", "hotel", "car", "train", "bus", "ferry", "activity", "other"]),
+      status: z.enum(["planned", "booked", "cancelled"]).default("booked"),
+      title: z.string().trim().min(2, "Give the booking a short title."),
+      provider: optionalText,
+      reference: optionalText,
+      origin: optionalText,
+      destination: optionalText,
+      startsAt: localDateTime,
+      endsAt: localDateTime,
+      amount: z.coerce.number().min(0, "The price can't be negative.").default(0),
+      currency: z.string().trim().min(3).max(5),
+      paidBy: z.enum(["personal", "company"]).default("personal"),
+      travelers: z.coerce.number().int().min(1).max(50).default(1),
+      bookingUrl: optionalText,
+      notes: optionalText,
+    }).parse(Object.fromEntries(formData.entries()));
+    if (input.startsAt && input.endsAt && input.endsAt < input.startsAt) return { error: "The booking ends before it starts." };
+    const { tripId, bookingId, ...body } = input;
+    const client = await api();
+    const saved = bookingId
+      ? await client.trips.updateBooking(tripId, bookingId, { ...body, currency: body.currency.toUpperCase() })
+      : await client.trips.createBooking(tripId, { ...body, currency: body.currency.toUpperCase() });
+    await revalidateTripPaths(tripId);
+    return { success: true, id: saved.id };
+  } catch (e) { return { error: errMsg(e) }; }
+}
+
+export async function deleteBookingAction(_: DialogState, formData: FormData): Promise<DialogState> {
+  try {
+    const tripId = String(formData.get("tripId") ?? "");
+    const bookingId = String(formData.get("bookingId") ?? "");
+    if (!tripId || !bookingId) return { error: "Missing booking." };
+    await (await api()).trips.deleteBooking(tripId, bookingId);
+    await revalidateTripPaths(tripId);
+    return { success: true };
+  } catch (e) { return { error: errMsg(e) }; }
+}
+
 export async function createTripDialogAction(_: DialogState, formData: FormData): Promise<DialogState> {
   try {
     const input = z.object({
@@ -36,14 +118,18 @@ export async function createTripDialogAction(_: DialogState, formData: FormData)
       startDate: z.string().date("Pick a start date."),
       endDate: z.string().date("Pick an end date."),
       status: z.enum(["draft", "active", "completed", "archived"]).default("active"),
+      kind: tripKindSchema.optional(),
+      companions: z.string().optional(),
     }).parse(Object.fromEntries(formData.entries()));
     if (input.endDate < input.startDate) return { error: "The trip can't end before it starts." };
     const travelerUserIds = formData.getAll("travelerUserIds").map(String).filter(Boolean);
+    const { companions, ...rest } = input;
     const trip = await (await api()).trips.create({
-      ...input,
+      ...rest,
       teamId: input.teamId ?? "",
       currency: input.currency.toUpperCase(),
       travelerUserIds,
+      companions: splitNames(companions),
     });
     revalidatePath(await wsPath("admin"));
     revalidatePath(await wsPath("admin", "/trips"));
@@ -60,6 +146,7 @@ const expenseFormSchema = z.object({
   date: z.string().date("Pick the date on the receipt."),
   notes: z.string().optional(),
   tripId: z.string().optional(),
+  bookingId: z.string().optional(),
   paymentMethod: z.enum(["cash", "personal_card", "company_card", "bank_transfer", "other"]).optional().or(z.literal("")),
   reimbursable: z.enum(["on", "true", "false"]).optional(),
   status: z.enum(["draft", "submitted"]).default("draft"),
@@ -85,6 +172,7 @@ async function readExpenseForm(formData: FormData, client: Awaited<ReturnType<ty
       // Unchecked checkboxes are absent from FormData; the hidden "false" keeps intent explicit.
       reimbursable: input.reimbursable !== "false",
       receiptFileUrl: uploadedReceipt?.url,
+      bookingId: input.bookingId || undefined,
     },
   };
 }

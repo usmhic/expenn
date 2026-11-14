@@ -63,11 +63,11 @@ function navFor(slug: string, role: Role, personal?: boolean): NavSection[] {
     const root = `/${slug}/traveler`;
     return [
       {
-        label: "Travel",
+        label: "Spend",
         items: [
           { label: "Home", href: root, icon: Home, exact: true },
-          { label: "Trips", href: `${root}/trips`, icon: MapIcon },
           { label: "Expenses", href: `${root}/expenses`, icon: Wallet, badgeKey: "rejectedExpenses" },
+          { label: "Trips", href: `${root}/trips`, icon: MapIcon },
           { label: "Documents", href: `${root}/documents`, icon: Files },
         ],
       },
@@ -99,9 +99,9 @@ function mobileNavFor(slug: string, role: Role): NavItem[] {
     const root = `/${slug}/traveler`;
     return [
       { label: "Home", href: root, icon: Home, exact: true },
-      { label: "Trips", href: `${root}/trips`, icon: MapIcon },
-      { label: "Capture", href: `${root}/capture`, icon: Camera },
       { label: "Expenses", href: `${root}/expenses`, icon: Wallet },
+      { label: "Capture", href: `${root}/capture`, icon: Camera },
+      { label: "Trips", href: `${root}/trips`, icon: MapIcon },
       { label: "Docs", href: `${root}/documents`, icon: Files },
     ];
   }
@@ -771,6 +771,9 @@ const STATUS_STYLES: Record<string, { cls: string; dot: string; label?: string }
   completed: { cls: "bg-emerald-500/12 text-emerald-800 dark:text-emerald-200", dot: "bg-emerald-500" },
   reimbursed: { cls: "bg-emerald-500/12 text-emerald-800 dark:text-emerald-200", dot: "bg-emerald-500", label: "Paid" },
   archived: { cls: "bg-muted text-muted-foreground", dot: "bg-subtle" },
+  booked: { cls: "bg-teal-500/12 text-teal-800 dark:text-teal-200", dot: "bg-teal-500", label: "Booked" },
+  planned: { cls: "bg-amber-500/14 text-amber-800 dark:text-amber-200", dot: "bg-amber-500", label: "To book" },
+  cancelled: { cls: "bg-muted text-muted-foreground line-through", dot: "bg-subtle" },
 };
 
 export function StatusBadge({ value, label }: { value: string; label?: string }) {
