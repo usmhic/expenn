@@ -10,7 +10,8 @@ public record CreateExpenseRequest(
     string? Notes,
     string? PaymentMethod,
     bool Reimbursable = true,
-    string? ReceiptFileUrl = null
+    string? ReceiptFileUrl = null,
+    string? BookingId = null
 );
 
 /// <summary>Replaces an editable (draft or rejected) expense. A rejected expense returns to draft.</summary>
@@ -51,7 +52,8 @@ public record ExpenseDto(
     DateTimeOffset? ReviewedAt = null,
     string? ReviewedByName = null,
     string? ReviewNote = null,
-    DateTimeOffset? ReimbursedAt = null
+    DateTimeOffset? ReimbursedAt = null,
+    string? BookingId = null
 );
 
 public record ReviewExpenseRequest(string Status, string? Notes = null); // approved | rejected | reimbursed

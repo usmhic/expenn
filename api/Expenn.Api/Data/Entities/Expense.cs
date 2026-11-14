@@ -9,6 +9,8 @@ public class Expense
     [Column("organization_id")] public string OrganizationId { get; set; } = string.Empty;
     [Column("user_id")] public string UserId { get; set; } = string.Empty;
     [Column("trip_id")] public string? TripId { get; set; }
+    /// <summary>The trip booking this receipt pays for, so the trip total counts it once.</summary>
+    [Column("booking_id")] public string? BookingId { get; set; }
     [Column("merchant")] public string Merchant { get; set; } = string.Empty;
     [Column("amount")] public decimal Amount { get; set; }
     [Column("currency")] public string Currency { get; set; } = "USD";
@@ -33,5 +35,6 @@ public class Expense
     public User User { get; set; } = null!;
     public User? ReviewedBy { get; set; }
     public Trip? Trip { get; set; }
+    public TripBooking? Booking { get; set; }
     public ICollection<ExpenseComment> Comments { get; set; } = [];
 }

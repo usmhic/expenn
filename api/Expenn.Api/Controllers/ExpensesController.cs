@@ -47,11 +47,25 @@ public class ExpensesController(
         var invalid = await ValidateAsync(req.Merchant, req.Amount, req.Currency, req.TripId, ct);
         if (invalid is not null) return BadRequest(new { error = invalid });
 
+        // A receipt for a booking must be filed on the booking's own trip.
+        string? bookingId = null;
+        if (!string.IsNullOrEmpty(req.BookingId))
+        {
+            var bookingTrip = await db.TripBookings
+                .Where(b => b.Id == req.BookingId && b.OrganizationId == currentUser.OrgId)
+                .Select(b => b.TripId)
+                .FirstOrDefaultAsync(ct);
+            if (bookingTrip is null || bookingTrip != req.TripId)
+                return BadRequest(new { error = "That booking doesn't belong to the selected trip" });
+            bookingId = req.BookingId;
+        }
+
         var expense = new Expense
         {
             OrganizationId = currentUser.OrgId,
             UserId = currentUser.UserId,
             Status = ExpenseStatus.Draft,
+            BookingId = bookingId,
         };
         Apply(expense, req.TripId, req.Merchant, req.Amount, req.Currency, req.Category, req.ExpenseDate,
             req.Notes, req.PaymentMethod, req.Reimbursable, req.ReceiptFileUrl);
@@ -71,6 +85,8 @@ public class ExpensesController(
         var invalid = await ValidateAsync(req.Merchant, req.Amount, req.Currency, req.TripId, ct);
         if (invalid is not null) return BadRequest(new { error = invalid });
 
+        // Moving a receipt to another trip detaches it from the old trip's booking.
+        if (expense.TripId != (string.IsNullOrEmpty(req.TripId) ? null : req.TripId)) expense.BookingId = null;
         Apply(expense, req.TripId, req.Merchant, req.Amount, req.Currency, req.Category, req.ExpenseDate,
             req.Notes, req.PaymentMethod, req.Reimbursable, req.ReceiptFileUrl);
         // A rejected expense goes back to draft; the review note stays visible until it is resubmitted.
@@ -349,7 +365,7 @@ public class ExpensesController(
         e.Id, e.OrganizationId, e.UserId, e.TripId, e.Merchant, e.Amount,
         e.Currency, e.Category, e.ExpenseDate, e.ReceiptFileUrl,
         e.Status, e.Notes, e.PaymentMethod, e.Reimbursable, e.CreatedAt, e.UpdatedAt,
-        tripName, travelerName, flags ?? [], e.SubmittedAt, e.ReviewedAt, reviewerName, e.ReviewNote, e.ReimbursedAt);
+        tripName, travelerName, flags ?? [], e.SubmittedAt, e.ReviewedAt, reviewerName, e.ReviewNote, e.ReimbursedAt, e.BookingId);
 
     private static string Timestamp(DateTimeOffset? value) =>
         value?.UtcDateTime.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) ?? string.Empty;

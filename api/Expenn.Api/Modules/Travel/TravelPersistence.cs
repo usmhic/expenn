@@ -17,6 +17,29 @@ internal static class TravelPersistence
             entity.HasOne(x => x.Organization).WithMany(x => x.Trips).HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(x => x.Team).WithMany().HasForeignKey(x => x.TeamId).OnDelete(DeleteBehavior.SetNull);
             entity.Property(x => x.RouteProfile).HasDefaultValue("driving-car");
+            entity.Property(x => x.Kind).HasMaxLength(20).HasDefaultValue("business");
+            entity.Property(x => x.Companions).HasDefaultValueSql("'{}'::text[]");
+        });
+
+        modelBuilder.Entity<TripBooking>(entity =>
+        {
+            entity.ToTable("trip_bookings", DomainSchemas.Travel);
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Kind).HasMaxLength(20);
+            entity.Property(x => x.Status).HasMaxLength(20);
+            entity.Property(x => x.PaidBy).HasMaxLength(20);
+            entity.Property(x => x.Title).HasMaxLength(200);
+            entity.Property(x => x.Provider).HasMaxLength(120);
+            entity.Property(x => x.Reference).HasMaxLength(80);
+            entity.Property(x => x.Origin).HasMaxLength(200);
+            entity.Property(x => x.Destination).HasMaxLength(200);
+            entity.Property(x => x.Currency).HasMaxLength(5);
+            entity.Property(x => x.BookingUrl).HasMaxLength(1000);
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+            entity.Property(x => x.Amount).HasColumnType("numeric(12,2)");
+            entity.HasIndex(x => new { x.TripId, x.StartsAt }).HasDatabaseName("trip_bookings_trip_start_idx");
+            entity.HasOne(x => x.Trip).WithMany(x => x.Bookings).HasForeignKey(x => x.TripId).OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(x => x.CreatedBy).WithMany().HasForeignKey(x => x.CreatedById).OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<TripStop>(entity =>

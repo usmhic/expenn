@@ -23,6 +23,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<TripTraveler> TripTravelers => Set<TripTraveler>();
     public DbSet<TripStop> TripStops => Set<TripStop>();
     public DbSet<TravelApproval> TravelApprovals => Set<TravelApproval>();
+    public DbSet<TripBooking> TripBookings => Set<TripBooking>();
     public DbSet<Expense> Expenses => Set<Expense>();
     public DbSet<ExpenseComment> ExpenseComments => Set<ExpenseComment>();
     public DbSet<Document> Documents => Set<Document>();
