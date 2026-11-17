@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CalendarDays, MapPin, Route as RouteIcon, Users } from "lucide-react";
 import { StatusBadge } from "@/components/layout/navigation";
 import type { TripDto } from "@/lib/api-client";
+import { tripKindLabel } from "@/lib/bookings";
 import { formatMoney } from "@/lib/expenses";
 import { formatDateRange, formatDistance, tripPhase } from "@/lib/trips";
 import { cn } from "@/lib/utils";
@@ -46,6 +47,7 @@ export function RouteThumbnail({ points, className }: { points?: [number, number
 
 export function TripCard({ trip, href, travelers, pending }: { trip: TripDto; href: string; travelers?: number; pending?: number }) {
   const phase = tripPhase(trip.startDate, trip.endDate);
+  const people = (travelers ?? trip.travelerCount ?? 0) + (trip.companions?.length ?? 0);
   return (
     <Link href={href} className="card card-flush card-interactive group flex flex-col">
       <div className="relative h-28 border-b border-border bg-muted/50">
@@ -74,7 +76,8 @@ export function TripCard({ trip, href, travelers, pending }: { trip: TripDto; hr
         <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
           <span className="flex items-center gap-1"><CalendarDays className="size-3.5" />{formatDateRange(trip.startDate, trip.endDate)}</span>
           {trip.routeDistanceMeters ? <span className="flex items-center gap-1"><RouteIcon className="size-3.5" />{formatDistance(trip.routeDistanceMeters)}</span> : null}
-          {travelers !== undefined && <span className="flex items-center gap-1"><Users className="size-3.5" />{travelers}</span>}
+          <span className="rounded-full bg-muted px-1.5 py-px text-[0.6875rem] font-medium">{tripKindLabel(trip.kind)}</span>
+          {people > 0 && <span className="flex items-center gap-1" title={`${people} ${people === 1 ? "person" : "people"}`}><Users className="size-3.5" />{people}</span>}
           {trip.budget > 0 && <span className="ml-auto font-medium text-foreground tabular-nums">{formatMoney(trip.budget, trip.currency, { compact: true })}</span>}
         </div>
       </div>
