@@ -45,6 +45,7 @@ export function SiteHeader({ account }: { account?: LandingAccountState | null }
   const ctaLabel = signedIn ? t.nav.openDashboard : t.nav.getStarted;
 
   const links = [
+    { href: "/#for", label: t.nav.audience },
     { href: "/#how", label: t.nav.product },
     { href: "/#trips", label: t.nav.trips },
     { href: "/#self-host", label: t.nav.selfHost },

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import {
-  AlertTriangle, ArrowRight, CalendarDays, Camera, ImageOff, Map as MapIcon, Receipt, Undo2, Wallet,
+  AlertTriangle, ArrowRight, CalendarDays, CalendarRange, Camera, ImageOff, Map as MapIcon, Receipt, Undo2, Wallet,
 } from "lucide-react";
 import { cookies } from "next/headers";
 import { AppShell, StatusBadge } from "@/components/layout/navigation";
@@ -8,8 +8,8 @@ import { EmptyState, PageHeader, SectionCard } from "@/components/layout/page";
 import { CreateExpenseDialog, SubmitDraftsButton } from "@/components/dialogs";
 import { RouteThumbnail } from "@/components/trips/trip-card";
 import { apiClient } from "@/lib/api-client";
-import { formatMoney, formatTotals, pick } from "@/lib/expenses";
-import { formatDateRange, formatDistance, formatDuration, tripDays, tripPhase } from "@/lib/trips";
+import { formatMoney, formatTotals, pick, totalsByCurrency } from "@/lib/expenses";
+import { formatDateRange, tripDays, tripPhase } from "@/lib/trips";
 import { cn } from "@/lib/utils";
 
 function fmt(date: string) {
@@ -20,13 +20,15 @@ export default async function TravelerHomePage({ params }: { params: Promise<{ w
   const { workspace } = await params;
   const root = `/${workspace}/traveler`;
   const api = apiClient({ cookie: (await cookies()).toString() });
-  const [me, trips, expenses, approvals, summary] = await Promise.all([
+  const [me, trips, expenses, approvals, summary, orgs] = await Promise.all([
     api.auth.me(),
     api.trips.list({ mine: true }),
     api.expenses.list({ mine: true }),
     api.trips.getApprovals({ mine: true }),
     api.expenses.summary(),
+    api.organizations.list().catch(() => []),
   ]);
+  const personal = orgs.find((o) => o.slug === workspace)?.accountType === "personal";
 
   const live = trips
     .map((t) => ({ trip: t, phase: tripPhase(t.startDate, t.endDate) }))
@@ -35,10 +37,19 @@ export default async function TravelerHomePage({ params }: { params: Promise<{ w
   const current = live.find((t) => t.phase.kind === "ongoing") ?? live[0];
   const currentTrip = current?.trip;
   const approval = currentTrip ? approvals.find((a) => a.tripId === currentTrip.id) : undefined;
-  const spent = currentTrip
-    ? expenses.filter((e) => e.tripId === currentTrip.id && e.currency === currentTrip.currency && e.status !== "rejected").reduce((s, e) => s + Number(e.amount), 0)
-    : 0;
-  const budgetPct = currentTrip && currentTrip.budget > 0 ? Math.round((spent / currentTrip.budget) * 100) : 0;
+  const costs = currentTrip ? await api.trips.getCosts(currentTrip.id).catch(() => null) : null;
+  const spent = costs?.spent ?? 0;
+  const tripTotal = costs?.total ?? 0;
+  const budgetPct = currentTrip && currentTrip.budget > 0 ? Math.round((tripTotal / currentTrip.budget) * 100) : 0;
+
+  // Personal spend over time, per currency (rejected receipts don't count).
+  const now = new Date();
+  const counted = expenses.filter((e) => e.status !== "rejected");
+  const thisMonth = totalsByCurrency(counted.filter((e) => {
+    const d = new Date(e.expenseDate);
+    return d.getUTCFullYear() === now.getUTCFullYear() && d.getUTCMonth() === now.getUTCMonth();
+  }));
+  const thisYear = totalsByCurrency(counted.filter((e) => new Date(e.expenseDate).getUTCFullYear() === now.getUTCFullYear()));
 
   const drafts = expenses.filter((e) => e.status === "draft");
   const sentBack = expenses.filter((e) => e.status === "rejected");
@@ -48,10 +59,10 @@ export default async function TravelerHomePage({ params }: { params: Promise<{ w
   const firstName = (me.name ?? "").split(/[\s@.]/)[0];
 
   return (
-    <AppShell role="traveler" breadcrumbs={[{ label: "Home" }]}>
+    <AppShell role="traveler" personal={personal} breadcrumbs={[{ label: "Home" }]}>
       <PageHeader
         title={firstName ? `Hi ${firstName}` : "Welcome back"}
-        description={currentTrip ? (current.phase.kind === "ongoing" ? `You're on day ${current.phase.days} of ${currentTrip.name}.` : `Next up: ${currentTrip.name}, in ${current.phase.days} day${current.phase.days === 1 ? "" : "s"}.`) : "Capture receipts as you go and get paid back quickly."}
+        description={currentTrip ? (current.phase.kind === "ongoing" ? `You're on day ${current.phase.days} of ${currentTrip.name}.` : `Next up: ${currentTrip.name}, in ${current.phase.days} day${current.phase.days === 1 ? "" : "s"}.`) : personal ? "Snap receipts as you go and see where your money goes." : "Capture receipts as you go and get paid back quickly."}
         actions={
           <>
             <CreateExpenseDialog trips={trips} defaultCurrency={expenses[0]?.currency} triggerClassName="secondary-button" />
@@ -77,24 +88,26 @@ export default async function TravelerHomePage({ params }: { params: Promise<{ w
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="surface-muted p-3">
-                <p className="text-xs text-muted-foreground">Spent on this trip</p>
-                <p className="mt-0.5 text-lg font-semibold tabular-nums">{formatMoney(spent, currentTrip.currency)}</p>
-                {currentTrip.budget > 0 && (
+                <p className="text-xs text-muted-foreground">Trip total so far</p>
+                <p className="mt-0.5 text-lg font-semibold tabular-nums">{formatMoney(tripTotal, currentTrip.currency)}</p>
+                {currentTrip.budget > 0 ? (
                   <>
                     <div className="progress-track mt-2"><div className={cn("progress-bar", budgetPct > 100 && "bg-destructive")} style={{ width: `${Math.min(100, budgetPct)}%` }} /></div>
-                    <p className="mt-1 text-xs text-muted-foreground">{budgetPct}% of {formatMoney(currentTrip.budget, currentTrip.currency, { compact: true })}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{budgetPct}% of {formatMoney(currentTrip.budget, currentTrip.currency, { compact: true })} budget</p>
                   </>
+                ) : (
+                  <p className="mt-1 text-xs text-muted-foreground">{formatMoney(spent, currentTrip.currency)} in receipts</p>
                 )}
               </div>
               <div className="surface-muted p-3">
-                <p className="text-xs text-muted-foreground">Planned route</p>
-                <p className="mt-0.5 text-lg font-semibold tabular-nums">{currentTrip.routeDistanceMeters ? formatDistance(currentTrip.routeDistanceMeters) : "Not planned"}</p>
+                <p className="text-xs text-muted-foreground">Per person</p>
+                <p className="mt-0.5 text-lg font-semibold tabular-nums">{costs ? formatMoney(costs.perPerson, currentTrip.currency) : "—"}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {currentTrip.routeDurationSeconds ? `${formatDuration(currentTrip.routeDurationSeconds)} · ${currentTrip.stopCount ?? 0} stops` : "Add stops on the trip map"}
+                  {costs ? `${costs.partySize} ${costs.partySize === 1 ? "person" : "people"} · ${costs.bookingCount} booking${costs.bookingCount === 1 ? "" : "s"}` : "Add bookings and receipts"}
                 </p>
               </div>
             </div>
-            <span className="mt-auto flex items-center gap-1 text-sm font-semibold text-primary">Open trip & map <ArrowRight className="size-4" /></span>
+            <span className="mt-auto flex items-center gap-1 text-sm font-semibold text-primary">Open trip <ArrowRight className="size-4" /></span>
           </div>
           <div className="relative hidden min-h-56 border-l border-border bg-muted/40 md:block">
             <RouteThumbnail points={currentTrip.routePreview} className="absolute inset-0 h-full w-full" />
@@ -102,12 +115,27 @@ export default async function TravelerHomePage({ params }: { params: Promise<{ w
         </Link>
       ) : (
         <div className="card mb-6">
-          <EmptyState icon={MapIcon} title="No trips planned" description="When you're added to a trip it appears here with its route, budget and approval." action={<Link href={`${root}/trips`} className="secondary-button">Go to trips</Link>} />
+          <EmptyState icon={MapIcon} title="No trips planned" description={personal ? "Create a trip to keep its bookings, receipts and total in one place." : "When you're added to a trip it appears here with its bookings, budget and approval."} action={<Link href={`${root}/trips`} className="secondary-button">Go to trips</Link>} />
         </div>
       )}
 
       {/* Money and actions */}
       <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {personal ? (
+          <>
+            <Link href={`${root}/expenses`} className="stat card-interactive border-mint/40 bg-mint/[0.07]">
+              <span className="stat-label"><Wallet className="size-4 text-teal-600" /> This month</span>
+              <span className="stat-value">{formatTotals(thisMonth, "—")}</span>
+              <span className="stat-sub">{new Intl.DateTimeFormat("en", { month: "long" }).format(now)} spending</span>
+            </Link>
+            <Link href={`${root}/expenses`} className="stat card-interactive">
+              <span className="stat-label"><CalendarRange className="size-4" /> This year</span>
+              <span className="stat-value">{formatTotals(thisYear, "—")}</span>
+              <span className="stat-sub">{counted.length} receipt{counted.length === 1 ? "" : "s"} in total</span>
+            </Link>
+          </>
+        ) : (
+          <>
         <Link href={`${root}/expenses?status=approved`} className="stat card-interactive border-mint/40 bg-mint/[0.07]">
           <span className="stat-label"><Wallet className="size-4 text-teal-600" /> Owed to you</span>
           <span className="stat-value">{owed || "—"}</span>
@@ -118,11 +146,21 @@ export default async function TravelerHomePage({ params }: { params: Promise<{ w
           <span className="stat-value">{inReview || "—"}</span>
           <span className="stat-sub">Waiting for your manager</span>
         </Link>
+          </>
+        )}
+        {personal ? (
+          <Link href={`${root}/trips`} className="stat card-interactive">
+            <span className="stat-label"><MapIcon className="size-4" /> Trips this year</span>
+            <span className="stat-value">{trips.filter((t) => new Date(t.startDate).getUTCFullYear() === now.getUTCFullYear()).length}</span>
+            <span className="stat-sub">{live.length} coming up or under way</span>
+          </Link>
+        ) : (
         <Link href={`${root}/expenses?status=rejected`} className={cn("stat card-interactive", sentBack.length > 0 && "border-destructive/30 bg-destructive/[0.04]")}>
           <span className="stat-label"><Undo2 className={cn("size-4", sentBack.length > 0 && "text-destructive")} /> Sent back</span>
           <span className="stat-value">{sentBack.length}</span>
           <span className="stat-sub">{sentBack.length ? "Fix and resubmit to get paid" : "Nothing to fix"}</span>
         </Link>
+        )}
         <div className="stat">
           <span className="stat-label"><AlertTriangle className="size-4" /> Drafts</span>
           <span className="stat-value">{drafts.length}</span>

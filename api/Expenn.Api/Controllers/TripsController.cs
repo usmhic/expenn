@@ -49,13 +49,16 @@ public class TripsController(
                 Id = t.Id, OrganizationId = t.OrganizationId, TeamId = t.TeamId, Name = t.Name,
                 Destination = t.Destination, StartDate = t.StartDate, EndDate = t.EndDate, Budget = t.Budget,
                 Currency = t.Currency, Status = t.Status, CreatedAt = t.CreatedAt, UpdatedAt = t.UpdatedAt,
+                Kind = t.Kind, Companions = t.Companions,
                 RouteDistanceMeters = t.RouteDistanceMeters, RouteDurationSeconds = t.RouteDurationSeconds,
                 RoutePreview = t.RoutePreview,
             })
             .ToListAsync(ct);
 
-        var stops = await LoadStopPointsAsync(trips.Select(t => t.Id).ToList(), ct);
-        return Ok(trips.Select(t => ToDto(t, stops.GetValueOrDefault(t.Id))).ToList());
+        var ids = trips.Select(t => t.Id).ToList();
+        var stops = await LoadStopPointsAsync(ids, ct);
+        var counts = await CountTravelersAsync(ids, ct);
+        return Ok(trips.Select(t => ToDto(t, stops.GetValueOrDefault(t.Id), counts.GetValueOrDefault(t.Id))).ToList());
     }
 
     // ── Get trip by ID ────────────────────────────────────────────────────────
@@ -78,7 +81,7 @@ public class TripsController(
         if (!allowed) return Forbid();
 
         var stops = await LoadStopPointsAsync([trip.Id], ct);
-        return Ok(ToDto(trip, stops.GetValueOrDefault(trip.Id)));
+        return Ok(ToDto(trip, stops.GetValueOrDefault(trip.Id), trip.Travelers.Count));
     }
 
     // ── Create trip ───────────────────────────────────────────────────────────
@@ -98,6 +101,12 @@ public class TripsController(
 
         if (end < start) return BadRequest(new { error = "End date must be after the start date" });
         if (req.Budget < 0) return BadRequest(new { error = "Budget can't be negative" });
+
+        var kind = string.IsNullOrWhiteSpace(req.Kind) ? (isPersonal ? TripKinds.Personal : TripKinds.Business) : req.Kind.Trim().ToLowerInvariant();
+        var kindCheck = TripKinds.Check(kind);
+        if (kindCheck.IsFailure) return BadRequest(new { error = kindCheck.Error });
+        var companions = TripKinds.NormalizeCompanions(req.Companions);
+        if (companions.IsFailure) return BadRequest(new { error = companions.Error });
 
         var team = string.IsNullOrEmpty(req.TeamId) && isPersonal
             ? await db.Teams.Where(t => t.OrganizationId == currentUser.OrgId).OrderBy(t => t.CreatedAt).FirstOrDefaultAsync(ct)
@@ -121,12 +130,15 @@ public class TripsController(
             Budget = req.Budget,
             Currency = req.Currency.ToUpperInvariant(),
             Status = req.Status,
+            Kind = kind,
+            Companions = companions.Value,
         };
         db.Trips.Add(trip);
         await db.SaveChangesAsync(ct);
 
         var travelerIds = (req.TravelerUserIds ?? []).Distinct().Where(x => !string.IsNullOrEmpty(x)).ToList();
         if (isPersonal && !travelerIds.Contains(currentUser.UserId)) travelerIds.Add(currentUser.UserId);
+        var assigned = 0;
         if (travelerIds.Count > 0)
         {
             // Only members of this workspace can be assigned.
@@ -141,9 +153,87 @@ public class TripsController(
                 UserId = uid,
             }));
             await db.SaveChangesAsync(ct);
+            assigned = validUsers.Count;
         }
 
-        return CreatedAtAction(nameof(GetById), new { id = trip.Id }, ToDto(trip, stops: null));
+        return CreatedAtAction(nameof(GetById), new { id = trip.Id }, ToDto(trip, stops: null, assigned));
+    }
+
+    // ── Edit trip details ─────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Edits name, destination, dates, budget, currency, trip type and companions. Company trips are
+    /// edited by admins and the owning team's managers; in a personal workspace the trip's travelers edit it.
+    /// </summary>
+    [HttpPut("{id}")]
+    public async Task<ActionResult<TripDto>> Update(string id, [FromBody] UpdateTripRequest req, CancellationToken ct)
+    {
+        var trip = await db.Trips.Include(t => t.Travelers)
+            .FirstOrDefaultAsync(t => t.Id == id && t.OrganizationId == currentUser.OrgId && t.DeletedAt == null, ct);
+        if (trip is null) return NotFound();
+
+        var isPersonal = await db.Organizations.AnyAsync(o => o.Id == currentUser.OrgId && o.AccountType == "personal", ct);
+        var allowed = isPersonal
+            ? currentUser.IsAdmin || trip.Travelers.Any(tt => tt.UserId == currentUser.UserId)
+            : currentUser.IsAdmin;
+        if (!allowed && !isPersonal && currentUser.Role == "manager")
+        {
+            var managed = await GetManagedTeamIdsAsync(ct);
+            allowed = trip.TeamId != null && managed.Contains(trip.TeamId);
+        }
+        if (!allowed) return Forbid();
+
+        if (req.Name is not null)
+        {
+            if (string.IsNullOrWhiteSpace(req.Name)) return BadRequest(new { error = "Give the trip a name" });
+            trip.Name = req.Name.Trim();
+        }
+        if (req.Destination is not null)
+        {
+            if (string.IsNullOrWhiteSpace(req.Destination)) return BadRequest(new { error = "Give the trip a destination" });
+            trip.Destination = req.Destination.Trim();
+        }
+        if (req.StartDate is not null)
+        {
+            if (!DateTime.TryParse(req.StartDate, out var start)) return BadRequest(new { error = "Invalid start date" });
+            trip.StartDate = new DateTimeOffset(start, TimeSpan.Zero);
+        }
+        if (req.EndDate is not null)
+        {
+            if (!DateTime.TryParse(req.EndDate, out var end)) return BadRequest(new { error = "Invalid end date" });
+            trip.EndDate = new DateTimeOffset(end, TimeSpan.Zero);
+        }
+        if (trip.EndDate < trip.StartDate) return BadRequest(new { error = "End date must be after the start date" });
+        if (req.Budget is not null)
+        {
+            if (req.Budget < 0) return BadRequest(new { error = "Budget can't be negative" });
+            trip.Budget = req.Budget.Value;
+        }
+        if (req.Currency is not null)
+        {
+            var currency = req.Currency.Trim().ToUpperInvariant();
+            if (currency.Length is < 3 or > 5) return BadRequest(new { error = "Use a 3-letter currency code, e.g. USD" });
+            trip.Currency = currency;
+        }
+        if (req.Kind is not null)
+        {
+            var kind = req.Kind.Trim().ToLowerInvariant();
+            var check = TripKinds.Check(kind);
+            if (check.IsFailure) return BadRequest(new { error = check.Error });
+            trip.Kind = kind;
+        }
+        if (req.Companions is not null)
+        {
+            var companions = TripKinds.NormalizeCompanions(req.Companions);
+            if (companions.IsFailure) return BadRequest(new { error = companions.Error });
+            trip.Companions = companions.Value;
+        }
+
+        trip.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(ct);
+
+        var stops = await LoadStopPointsAsync([trip.Id], ct);
+        return Ok(ToDto(trip, stops.GetValueOrDefault(trip.Id), trip.Travelers.Count));
     }
 
     // ── Travelers ─────────────────────────────────────────────────────────────
@@ -215,7 +305,8 @@ public class TripsController(
         await db.SaveChangesAsync(ct);
 
         var stops = await LoadStopPointsAsync([trip.Id], ct);
-        return Ok(ToDto(trip, stops.GetValueOrDefault(trip.Id)));
+        var counts = await CountTravelersAsync([trip.Id], ct);
+        return Ok(ToDto(trip, stops.GetValueOrDefault(trip.Id), counts.GetValueOrDefault(trip.Id)));
     }
 
     // ── Approvals ─────────────────────────────────────────────────────────────
@@ -358,7 +449,17 @@ public class TripsController(
         return points.GroupBy(p => p.TripId).ToDictionary(g => g.Key, g => g.ToList());
     }
 
-    private static TripDto ToDto(Trip t, List<StopPoint>? stops)
+    private async Task<Dictionary<string, int>> CountTravelersAsync(List<string> tripIds, CancellationToken ct)
+    {
+        if (tripIds.Count == 0) return [];
+        return await db.TripTravelers
+            .Where(tt => tripIds.Contains(tt.TripId))
+            .GroupBy(tt => tt.TripId)
+            .Select(g => new { g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.Key, x => x.Count, ct);
+    }
+
+    private static TripDto ToDto(Trip t, List<StopPoint>? stops, int travelerCount)
     {
         stops ??= [];
         var preview = TripRouteStore.ReadPreview(t.RoutePreview)
@@ -368,6 +469,7 @@ public class TripsController(
             t.Id, t.OrganizationId, t.TeamId, t.Name, t.Destination,
             t.StartDate, t.EndDate, t.Budget, t.Currency, t.Status, t.CreatedAt, t.UpdatedAt,
             stops.Count, t.RouteDistanceMeters, t.RouteDurationSeconds,
-            TripItinerary.Summarize(stops.Select(s => s.Name).ToList()), preview);
+            TripItinerary.Summarize(stops.Select(s => s.Name).ToList()), preview,
+            t.Kind, t.Companions, travelerCount);
     }
 }

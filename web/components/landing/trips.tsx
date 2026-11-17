@@ -17,7 +17,7 @@ import {
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { Eyebrow } from "./primitives";
-import { MapIllustration } from "./trip-planner-mock";
+import { MapIllustration, TripPlannerMock } from "./trip-planner-mock";
 
 function BentoCard({ title, d, className, children }: { title: string; d: string; className?: string; children: ReactNode }) {
   return (
@@ -48,7 +48,11 @@ export function TripsSection() {
           <p className="lp-lead">{tr.sub}</p>
         </div>
 
-        <div className="mt-12 grid gap-4 sm:mt-16 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5">
+        <div className="mt-12 sm:mt-16">
+          <TripPlannerMock />
+        </div>
+
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5">
           {/* Compare routes */}
           <BentoCard title={tr.routes.title} d={tr.routes.d} className="sm:col-span-2">
             <div className="grid gap-4 md:grid-cols-[1fr_16rem]">

@@ -55,6 +55,8 @@ export function ExpenseFormFields({
 
   return (
     <div className="grid gap-3">
+      {/* A receipt for a booking stays linked only while it's filed on that booking's trip. */}
+      {expense?.bookingId && tripId === expense.tripId && <input type="hidden" name="bookingId" value={expense.bookingId} />}
       <ReceiptInput existingUrl={expense?.receiptFileUrl} large={large} />
 
       <div className="grid grid-cols-[minmax(0,1fr)_6.5rem] gap-2">

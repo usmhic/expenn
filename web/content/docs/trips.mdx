@@ -1,21 +1,23 @@
 ---
 title: Trips & route planning
-description: Create trips, plan multi-stop routes on the map, assign travelers and track spend
+description: Create trips, save bookings, see what a trip costs per person, and plan routes on the map
 ---
 
-A **trip** brings everything about a journey together: dates, budget and currency, who's travelling, the approval, the route and every expense logged against it.
+A **trip** brings everything about a journey together: dates, budget and currency, who's travelling, bookings, receipts, the total cost, the approval and the route.
 
 ## Creating a trip
 
 Choose **Trips → New trip** and fill in:
 
+- **Who it's for** — *Business* or *Group* in a company workspace; *Solo*, *Family* or *Group* in a personal one
+- **Who else is coming** (family and group trips) — names of people without an account, e.g. your partner and children. They count toward the cost per person.
 - **Trip name** — e.g. "Berlin client summit"
 - **Main destination** — city or region
 - **Start and end dates**
 - **Budget** (optional) and **currency** — the budget bar on the trip page counts expenses in this currency
 - **Team** and **who's travelling** (company workspaces)
 
-When you select **Create and plan route**, the trip opens on its map so you can add stops right away.
+When you select **Create trip**, the trip opens so you can add bookings and receipts right away. Select **Edit trip** later to change the name, dates, budget, type or companions.
 
 Who can create trips:
 
@@ -23,6 +25,31 @@ Who can create trips:
 |---|---|
 | Company | Owners, admins, and managers (for their own teams) |
 | Personal | You — you're added to every trip you create |
+
+## Bookings
+
+Save every flight, stay, car rental, train, bus, ferry or ticket on the trip, so its price counts toward the total before you have a receipt.
+
+1. **Find it.** Select **Find & book** to open a provider with the trip's destination and dates filled in: Google Flights, Booking.com, Airbnb, Kayak (cars), Rome2Rio (trains, buses and ferries, from the first stop on the route) or GetYourGuide. Book there as usual. Expenn doesn't sell travel.
+2. **Save it.** Select **Add booking**, choose the type, and enter a title, times, confirmation code, total price and how many people it covers. In company workspaces, say whether you paid or the company did.
+3. **Mark its status.** *Booked* means confirmed. *Planned* is an estimate for something you haven't booked yet. It counts toward the total and the budget, shown lighter. *Cancelled* bookings don't count.
+4. **Add the receipt.** On a confirmed booking, select **Receipt** to open a prefilled expense. Attach the invoice and save it. From then on the receipt counts instead of the booking, so nothing is counted twice.
+
+Times are local to where the booking happens: a 10:15 departure from Frankfurt stays 10:15.
+
+## What the trip costs
+
+The **Trip total** at the top of every trip adds up:
+
+- **Receipts** logged on the trip (anything not sent back)
+- **Booked** bookings that don't have a receipt yet
+- **Planned** bookings, shown as "still to book"
+
+It also shows the total **per person** (travelers plus companions) and **per day**, how much of the budget is used, and where the money goes by category. In company workspaces it splits what people paid out of pocket from what the company paid, shows what's in review, approved and reimbursed, and admins and managers see receipts by traveler. Amounts in other currencies are listed under the total and never converted.
+
+<Callout type="info">
+  In a company workspace, travelers see their own receipts plus every booking. Draft receipts stay private to whoever wrote them until they're submitted.
+</Callout>
 
 ## Planning the route
 
@@ -69,10 +96,11 @@ From any of these they can approve or decline it. Several requests can be approv
 
 The trip page shows:
 
-- **Spent / approved spend** against the budget, with the amount still in review
-- **Route** distance and travel time
-- **Expenses** on the trip, with their status
-- **Reimbursement** — what's approved and still due to each traveler (admins)
+- **Trip total** with the budget, per-person and per-day costs, and the category breakdown
+- **Bookings** and whether each one has a receipt
+- **Receipts** on the trip, with their status
+- **Route & stops** with distance and travel time
+- **Reimbursement**: what's approved and still due to each traveler (admins)
 
 ## Setting up routing (administrators)
 

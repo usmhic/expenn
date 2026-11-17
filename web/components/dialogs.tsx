@@ -14,6 +14,7 @@ import { DateButton } from "@/components/ui/date-button";
 import { ExpenseFormFields, type ExpenseFormTrip } from "@/components/expense-form";
 import type { ExpenseDto } from "@/lib/api-client";
 import { COMMON_CURRENCIES } from "@/lib/expenses";
+import { tripKindsFor } from "@/lib/bookings";
 import { cn } from "@/lib/utils";
 import {
   addToTeamDialogAction,
@@ -112,6 +113,8 @@ export function CreateTripDialog({
   const [open, setOpen] = useState(false);
   const [formKey, setFormKey] = useState(0);
   const [state, action] = useActionState(createTripDialogAction, null as DialogState);
+  const kinds = tripKindsFor(Boolean(personal));
+  const [kind, setKind] = useState(kinds[0].value);
 
   useEffect(() => {
     if (!state?.success) return;
@@ -119,7 +122,7 @@ export function CreateTripDialog({
       setOpen(false);
       setFormKey((k) => k + 1);
     });
-    toast.success("Trip created. Add stops to plan the route.");
+    toast.success("Trip created. Add bookings and receipts as you go.");
     if (tripHrefBase && state.id) router.push(`${tripHrefBase}/${state.id}`);
     else router.refresh();
   }, [state, router, tripHrefBase]);
@@ -133,11 +136,33 @@ export function CreateTripDialog({
       </DialogTrigger>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Plan a new trip</DialogTitle>
-          <p className="text-sm text-muted-foreground">Set the basics now — you&apos;ll add stops and routes on the map next.</p>
+          <DialogTitle>New trip</DialogTitle>
+          <p className="text-sm text-muted-foreground">Set the basics now. Bookings, receipts and stops come next.</p>
         </DialogHeader>
         <form key={formKey} action={action} className="grid gap-4">
           {state?.error && <ErrorBanner message={state.error} />}
+          <input type="hidden" name="kind" value={kind} />
+          <fieldset>
+            <legend className="mb-2 text-[0.8125rem] font-semibold">Who&apos;s it for?</legend>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="radiogroup">
+              {kinds.map((k) => (
+                <button
+                  key={k.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={kind === k.value}
+                  onClick={() => setKind(k.value)}
+                  className={cn(
+                    "rounded-xl border px-3 py-2 text-left transition-colors",
+                    kind === k.value ? "border-primary/50 bg-accent text-accent-foreground" : "border-border hover:border-border-strong"
+                  )}
+                >
+                  <span className="block text-sm font-semibold">{k.label}</span>
+                  <span className="block text-xs text-muted-foreground">{k.hint}</span>
+                </button>
+              ))}
+            </div>
+          </fieldset>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="field sm:col-span-2">
               Trip name
@@ -147,6 +172,13 @@ export function CreateTripDialog({
               Main destination
               <input name="destination" required minLength={2} placeholder="City or region" className="form-control" />
             </label>
+            {(kind === "family" || kind === "group") && (
+              <label className="field sm:col-span-2">
+                Who else is coming? <span className="field-hint">Names, separated by commas</span>
+                <input name="companions" placeholder={kind === "family" ? "e.g. Alex, Mia, Leo" : "e.g. Sam, Priya"} className="form-control" />
+                <span className="text-xs font-normal text-muted-foreground">Used to work out the cost per person. They don&apos;t need an account.</span>
+              </label>
+            )}
             <label className="field">
               Starts
               <DateButton name="startDate" required placeholder="Start date" className="w-full" />
@@ -204,7 +236,7 @@ export function CreateTripDialog({
           <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
             <button type="button" className="secondary-button" onClick={() => setOpen(false)}>Cancel</button>
             <SubmitButton pendingText="Creating…" className="primary-button" disabled={!personal && teams.length === 0}>
-              Create and plan route
+              Create trip
             </SubmitButton>
           </div>
         </form>

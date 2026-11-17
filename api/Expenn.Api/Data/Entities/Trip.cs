@@ -15,6 +15,10 @@ public class Trip
     [Column("budget")] public decimal Budget { get; set; }
     [Column("currency")] public string Currency { get; set; } = "USD";
     [Column("status")] public string Status { get; set; } = "draft";
+    /// <summary>business | personal | family | group — who the trip is for and how costs are shared.</summary>
+    [Column("kind")] public string Kind { get; set; } = "business";
+    /// <summary>People on the trip who don't have an account, e.g. family members. Count toward per-person costs.</summary>
+    [Column("companions")] public List<string> Companions { get; set; } = [];
     [Column("created_at")] public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     [Column("updated_at")] public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
     [Column("deleted_at")] public DateTimeOffset? DeletedAt { get; set; }
@@ -35,4 +39,5 @@ public class Trip
     public ICollection<TravelApproval> Approvals { get; set; } = [];
     public ICollection<Expense> Expenses { get; set; } = [];
     public ICollection<TripStop> Stops { get; set; } = [];
+    public ICollection<TripBooking> Bookings { get; set; } = [];
 }

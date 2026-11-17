@@ -9,7 +9,8 @@ export type Lang = "en" | "es";
 const en = {
   nav: {
     product: "Product",
-    trips: "Trip planning",
+    trips: "Trips",
+    audience: "Who it's for",
     security: "Security",
     selfHost: "Self-host",
     faq: "FAQ",
@@ -33,14 +34,71 @@ const en = {
   },
   hero: {
     badgeNew: "New",
-    badge: "Trip planning with maps and routing",
-    title1: "Business travel,",
-    title2: "from route to reimbursement.",
-    sub: "Expenn is free, open-source expense and travel management for teams. Plan multi-stop trips on a map, capture receipts in seconds, and approve and pay from one queue, all on your own servers.",
+    badge: "Bookings and trip totals, per person",
+    title1: "Every receipt. Every trip.",
+    title2: "Every total, in one place.",
+    sub: "Expenn tracks what you spend, for yourself, your family or your whole organisation. Snap receipts, save flights and hotels, and see what each trip really costs per person and per day. Teams get approvals and reimbursement too. Free, open source and self-hosted.",
     ctaPrimary: "Get started",
     ctaDemo: "Live demo",
     ctaGithub: "Star on GitHub",
     points: ["Free and MIT licensed", "Self-hosted with Docker", "SSO ready"],
+  },
+  costMock: {
+    url: "expenn.example.com/trips/lisbon",
+    kind: "Family",
+    party: "4 people",
+    dates: "20–27 Dec",
+    trip: "Lisbon winter holiday",
+    totalLabel: "Trip total",
+    total: "€3,480",
+    perPerson: "€870",
+    perPersonLabel: "per person",
+    perDay: "€435",
+    perDayLabel: "per day",
+    budget: "Budget €4,000",
+    budgetLeft: "€520 left",
+    categories: [
+      { name: "Flights", value: "€1,240", share: 36 },
+      { name: "Stay", value: "€1,120", share: 32 },
+      { name: "Food", value: "€560", share: 16 },
+      { name: "Car", value: "€310", share: 9 },
+      { name: "Activities", value: "€250", share: 7 },
+    ],
+    bookingsTitle: "Bookings",
+    bookings: [
+      { title: "TP 545 Berlin → Lisbon", meta: "4 travelers · Ref Q7XK2M", amount: "€1,240", status: "Booked" },
+      { title: "Apartment in Baixa", meta: "7 nights · Airbnb", amount: "€1,120", status: "Booked" },
+      { title: "Car rental", meta: "Pick-up 22 Dec", amount: "€310", status: "To book" },
+    ],
+    receiptsTitle: "Receipts",
+    snap: "Snap",
+    receipts: [
+      { title: "Oceanário de Lisboa", meta: "4 tickets · receipt attached", amount: "€96.00" },
+      { title: "Pastéis de Belém", meta: "Food · receipt attached", amount: "€18.40" },
+    ],
+    label: "Illustration of an Expenn trip: a €3,480 family trip total split per person and per category, with its flight, apartment and car bookings and two receipts.",
+  },
+  audience: {
+    eyebrow: "Who it's for",
+    title: "Your receipts, your family's trips, your team's spend.",
+    sub: "Start with a personal workspace in a minute. Create a company workspace when your team needs approvals and reimbursement.",
+    items: [
+      {
+        t: "Individuals",
+        d: "Keep every receipt and know where your money goes.",
+        points: ["Snap a receipt in seconds", "Spending this month and this year", "Trips with a budget and a running total"],
+      },
+      {
+        t: "Families and friends",
+        d: "Plan the holiday together and see the cost per person.",
+        points: ["Add companions without accounts", "Save flights, stays and rentals", "Total per person and per day"],
+      },
+      {
+        t: "Organisations",
+        d: "Track what your people spend on trips, and pay them back fast.",
+        points: ["Travel approval before anyone books", "One queue to review and pay", "Spend per trip, traveler and currency"],
+      },
+    ],
   },
   mock: {
     url: "expenn.example.com/trips/lisbon",
@@ -74,7 +132,7 @@ const en = {
   how: {
     eyebrow: "How it works",
     title: "Four steps from receipt to money back.",
-    sub: "Travelers capture, finance decides, everyone can see where things stand. No spreadsheets, no chasing.",
+    sub: "On your own, a receipt is filed in seconds. In a company, travelers capture, finance decides, and everyone can see where things stand.",
     steps: [
       { t: "Capture", d: "Snap a photo or drop a PDF. The receipt comes first and the form follows." },
       { t: "Submit", d: "Log it against the trip and send it for approval with one tap." },
@@ -83,10 +141,10 @@ const en = {
     ],
   },
   trips: {
-    eyebrow: "Trip planning",
-    title1: "Plan every stop on a map.",
-    title2: "Know every leg before you go.",
-    sub: "Build multi-stop trips on an interactive map, compare routes for every way of getting around, and let Expenn find a better order. Each leg shows its distance and travel time, and the itinerary keeps dates and notes together.",
+    eyebrow: "Trips",
+    title1: "Plan, book and total every trip.",
+    title2: "Routes included.",
+    sub: "Give each trip a budget, then find and save every flight, stay and rental with its price. Expenn adds bookings and receipts together, counts each one once, and shows the total per person and per day. When you need it, plan the route on a map too.",
     routes: {
       title: "Compare routes",
       d: "Driving, cycling or walking, with alternatives side by side.",
@@ -237,7 +295,7 @@ const en = {
     sub: "Expenn is MIT licensed and has no paid plans. Clone the repository, add your secrets and start the stack: PostgreSQL, MinIO, RabbitMQ, the API and the web app come up together.",
     steps: [
       { t: "Clone the repository", d: "Everything lives in one repo on GitHub." },
-      { t: "Add your secrets", d: "Copy .env.example and fill in the values marked FILL ME." },
+      { t: "Add your secrets", d: "Copy .env.example and fill in the empty values." },
       { t: "Start the stack", d: "Run docker compose up and open localhost:3001." },
     ],
     github: "View on GitHub",
@@ -245,7 +303,7 @@ const en = {
     terminal: "Terminal",
     copy: "Copy commands",
     copied: "Copied",
-    comment: "# fill in the secrets marked FILL ME",
+    comment: "# fill in the empty values",
     ready: "Web app ready on http://localhost:3001",
   },
   faq: {
@@ -266,6 +324,14 @@ const en = {
       {
         q: "What do I need to run it?",
         a: "A machine with Docker and Docker Compose. The stack includes PostgreSQL, MinIO for S3-compatible storage, RabbitMQ, the .NET API and the web app. In production you can point it at your own database and storage.",
+      },
+      {
+        q: "Can I book flights and hotels in Expenn?",
+        a: "Expenn doesn't sell travel. From a trip, Find & book opens Google Flights, Booking.com, Airbnb and other providers with your destination and dates filled in. Save the confirmation and price back to the trip and it counts toward the total until you add the receipt.",
+      },
+      {
+        q: "Can I use it just for myself or my family?",
+        a: "Yes. A personal workspace tracks your own receipts and trips. Mark a trip as a family or group trip, add who's coming, and Expenn shows the cost per person.",
       },
       {
         q: "How does trip routing work?",
@@ -292,7 +358,7 @@ const en = {
     ctaDemo: "Try the live demo",
   },
   footer: {
-    tag: "Open-source expense and travel management for teams. Self-hosted, free, and yours.",
+    tag: "Open-source expense tracking for people, families and teams. Self-hosted, free, and yours.",
     product: "Product",
     resources: "Resources",
     legal: "Legal",
@@ -367,6 +433,7 @@ const es: Dict = {
   nav: {
     product: "Producto",
     trips: "Viajes",
+    audience: "Para quién",
     security: "Seguridad",
     selfHost: "Autoalojado",
     faq: "Preguntas",
@@ -390,14 +457,71 @@ const es: Dict = {
   },
   hero: {
     badgeNew: "Nuevo",
-    badge: "Planificación de viajes con mapas y rutas",
-    title1: "Viajes de empresa,",
-    title2: "de la ruta al reembolso.",
-    sub: "Expenn es software libre y gratuito para gestionar los gastos y viajes de tu equipo. Planifica viajes con varias paradas en un mapa, captura recibos en segundos y aprueba y paga desde una sola bandeja, todo en tus propios servidores.",
+    badge: "Reservas y total del viaje, por persona",
+    title1: "Cada recibo. Cada viaje.",
+    title2: "Cada total, en un solo lugar.",
+    sub: "Expenn registra lo que gastas, tú solo, en familia o en toda tu organización. Fotografía recibos, guarda vuelos y hoteles y descubre cuánto cuesta de verdad cada viaje por persona y por día. Los equipos también tienen aprobaciones y reembolsos. Gratis, de código abierto y autoalojado.",
     ctaPrimary: "Empezar",
     ctaDemo: "Ver la demo",
     ctaGithub: "Danos una estrella",
     points: ["Gratis y con licencia MIT", "Autoalojado con Docker", "Listo para SSO"],
+  },
+  costMock: {
+    url: "expenn.example.com/trips/lisboa",
+    kind: "Familia",
+    party: "4 personas",
+    dates: "20–27 dic",
+    trip: "Lisboa en invierno",
+    totalLabel: "Total del viaje",
+    total: "3.480 €",
+    perPerson: "870 €",
+    perPersonLabel: "por persona",
+    perDay: "435 €",
+    perDayLabel: "por día",
+    budget: "Presupuesto 4.000 €",
+    budgetLeft: "Quedan 520 €",
+    categories: [
+      { name: "Vuelos", value: "1.240 €", share: 36 },
+      { name: "Alojamiento", value: "1.120 €", share: 32 },
+      { name: "Comida", value: "560 €", share: 16 },
+      { name: "Coche", value: "310 €", share: 9 },
+      { name: "Actividades", value: "250 €", share: 7 },
+    ],
+    bookingsTitle: "Reservas",
+    bookings: [
+      { title: "TP 545 Berlín → Lisboa", meta: "4 viajeros · Ref Q7XK2M", amount: "1.240 €", status: "Reservado" },
+      { title: "Apartamento en Baixa", meta: "7 noches · Airbnb", amount: "1.120 €", status: "Reservado" },
+      { title: "Alquiler de coche", meta: "Recogida 22 dic", amount: "310 €", status: "Por reservar" },
+    ],
+    receiptsTitle: "Recibos",
+    snap: "Foto",
+    receipts: [
+      { title: "Oceanário de Lisboa", meta: "4 entradas · recibo adjunto", amount: "96,00 €" },
+      { title: "Pastéis de Belém", meta: "Comida · recibo adjunto", amount: "18,40 €" },
+    ],
+    label: "Ilustración de un viaje en Expenn: un viaje familiar de 3.480 € repartido por persona y por categoría, con las reservas de vuelo, apartamento y coche y dos recibos.",
+  },
+  audience: {
+    eyebrow: "Para quién",
+    title: "Tus recibos, los viajes de tu familia, el gasto de tu equipo.",
+    sub: "Empieza con un espacio personal en un minuto. Crea un espacio de empresa cuando tu equipo necesite aprobaciones y reembolsos.",
+    items: [
+      {
+        t: "Particulares",
+        d: "Guarda cada recibo y sabe en qué se va tu dinero.",
+        points: ["Fotografía un recibo en segundos", "Gasto de este mes y de este año", "Viajes con presupuesto y total al día"],
+      },
+      {
+        t: "Familias y amigos",
+        d: "Planificad las vacaciones juntos y ved el coste por persona.",
+        points: ["Añade acompañantes sin cuenta", "Guarda vuelos, alojamientos y alquileres", "Total por persona y por día"],
+      },
+      {
+        t: "Organizaciones",
+        d: "Controla lo que tu equipo gasta en viajes y reembolsa rápido.",
+        points: ["Aprobación del viaje antes de reservar", "Una bandeja para revisar y pagar", "Gasto por viaje, viajero y moneda"],
+      },
+    ],
   },
   mock: {
     url: "expenn.example.com/trips/lisboa",
@@ -431,7 +555,7 @@ const es: Dict = {
   how: {
     eyebrow: "Cómo funciona",
     title: "Cuatro pasos del recibo al reembolso.",
-    sub: "Quien viaja captura, finanzas decide y todos saben en qué punto está cada gasto. Sin hojas de cálculo ni persecuciones.",
+    sub: "Si vas por tu cuenta, un recibo queda guardado en segundos. En una empresa, quien viaja captura, finanzas decide y todos saben en qué punto está cada gasto.",
     steps: [
       { t: "Captura", d: "Haz una foto o sube un PDF. Primero el recibo; el formulario viene después." },
       { t: "Envía", d: "Asígnalo al viaje y mándalo a aprobar con un solo toque." },
@@ -440,10 +564,10 @@ const es: Dict = {
     ],
   },
   trips: {
-    eyebrow: "Planificación de viajes",
-    title1: "Cada parada, en el mapa.",
-    title2: "Cada trayecto, claro antes de salir.",
-    sub: "Crea viajes con varias paradas en un mapa interactivo, compara rutas para cada forma de desplazarte y deja que Expenn encuentre un orden mejor. Cada tramo muestra su distancia y duración, y el itinerario reúne fechas y notas.",
+    eyebrow: "Viajes",
+    title1: "Planifica, reserva y suma cada viaje.",
+    title2: "Rutas incluidas.",
+    sub: "Dale un presupuesto a cada viaje y guarda cada vuelo, alojamiento y alquiler con su precio. Expenn suma reservas y recibos, cuenta cada uno una sola vez y muestra el total por persona y por día. Cuando lo necesites, planifica también la ruta en el mapa.",
     routes: {
       title: "Compara rutas",
       d: "En coche, en bici o a pie, con alternativas una al lado de otra.",
@@ -594,7 +718,7 @@ const es: Dict = {
     sub: "Expenn tiene licencia MIT y no tiene planes de pago. Clona el repositorio, añade tus secretos y arranca: PostgreSQL, MinIO, RabbitMQ, la API y la app web se levantan juntos.",
     steps: [
       { t: "Clona el repositorio", d: "Todo está en un único repositorio de GitHub." },
-      { t: "Añade tus secretos", d: "Copia .env.example y rellena los valores marcados FILL ME." },
+      { t: "Añade tus secretos", d: "Copia .env.example y rellena los valores vacíos." },
       { t: "Arranca el stack", d: "Ejecuta docker compose up y abre localhost:3001." },
     ],
     github: "Ver en GitHub",
@@ -602,7 +726,7 @@ const es: Dict = {
     terminal: "Terminal",
     copy: "Copiar comandos",
     copied: "Copiado",
-    comment: "# rellena los secretos marcados FILL ME",
+    comment: "# rellena los valores vacíos",
     ready: "App web lista en http://localhost:3001",
   },
   faq: {
@@ -623,6 +747,14 @@ const es: Dict = {
       {
         q: "¿Qué necesito para instalarlo?",
         a: "Una máquina con Docker y Docker Compose. El stack incluye PostgreSQL, MinIO como almacenamiento compatible con S3, RabbitMQ, la API en .NET y la app web. En producción puedes usar tu propia base de datos y almacenamiento.",
+      },
+      {
+        q: "¿Puedo reservar vuelos y hoteles en Expenn?",
+        a: "Expenn no vende viajes. Desde un viaje, «Buscar y reservar» abre Google Flights, Booking.com, Airbnb y otros proveedores con tu destino y tus fechas. Guarda la confirmación y el precio en el viaje y contará en el total hasta que añadas el recibo.",
+      },
+      {
+        q: "¿Puedo usarlo solo para mí o para mi familia?",
+        a: "Sí. Un espacio personal registra tus propios recibos y viajes. Marca un viaje como familiar o de grupo, añade quién viene y Expenn muestra el coste por persona.",
       },
       {
         q: "¿Cómo funcionan las rutas?",
@@ -649,7 +781,7 @@ const es: Dict = {
     ctaDemo: "Probar la demo",
   },
   footer: {
-    tag: "Gestión de gastos y viajes de código abierto para equipos. Autoalojada, gratuita y tuya.",
+    tag: "Control de gastos de código abierto para personas, familias y equipos. Autoalojado, gratuito y tuyo.",
     product: "Producto",
     resources: "Recursos",
     legal: "Legal",

@@ -9,7 +9,21 @@ public record CreateTripRequest(
     decimal Budget,
     string Currency,
     string Status = "draft",
-    List<string>? TravelerUserIds = null
+    List<string>? TravelerUserIds = null,
+    string? Kind = null,
+    List<string>? Companions = null
+);
+
+/// <summary>Edits a trip's details. Omitted fields keep their current value.</summary>
+public record UpdateTripRequest(
+    string? Name,
+    string? Destination,
+    string? StartDate,
+    string? EndDate,
+    decimal? Budget,
+    string? Currency,
+    string? Kind,
+    List<string>? Companions
 );
 
 public record TripDto(
@@ -29,7 +43,10 @@ public record TripDto(
     double? RouteDistanceMeters = null,
     double? RouteDurationSeconds = null,
     string? RouteSummary = null,
-    List<double[]>? RoutePreview = null
+    List<double[]>? RoutePreview = null,
+    string Kind = "business",
+    List<string>? Companions = null,
+    int TravelerCount = 0
 );
 
 public record TripTravelerDto(

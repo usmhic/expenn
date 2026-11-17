@@ -19,6 +19,8 @@ internal static class ExpensesPersistence
             entity.HasOne(x => x.ReviewedBy).WithMany().HasForeignKey(x => x.ReviewedById).OnDelete(DeleteBehavior.SetNull);
             entity.Property(x => x.ReviewNote).HasMaxLength(1000);
             entity.HasOne(x => x.Trip).WithMany(x => x.Expenses).HasForeignKey(x => x.TripId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasOne(x => x.Booking).WithMany().HasForeignKey(x => x.BookingId).OnDelete(DeleteBehavior.SetNull);
+            entity.HasIndex(x => x.BookingId).HasDatabaseName("expenses_booking_idx");
         });
 
         modelBuilder.Entity<ExpenseComment>(entity =>

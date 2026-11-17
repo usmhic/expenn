@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Trip bookings.** Save flights, stays, car rentals, trains, buses, ferries and tickets on a trip
+  with times, confirmation code, price, who paid and a link to manage it. A booking can be planned
+  (an estimate), booked or cancelled. **Find & book** opens Google Flights, Booking.com, Airbnb, Kayak,
+  Rome2Rio or GetYourGuide with the trip's destination and dates; Expenn doesn't sell travel itself.
+  Stored in `travel.trip_bookings` (migration `AddTripBookings`), served by `/api/trips/{id}/bookings`.
+- **Trip totals.** `/api/trips/{id}/costs` and a new trip summary add receipts and bookings without a
+  receipt (each counted once), split by category, and show the total per person, per day, against
+  budget, paid out of pocket vs by the company, and reimbursement status. Other currencies are listed
+  separately, never converted.
+- **Receipts for bookings.** "Receipt" on a confirmed booking opens a prefilled expense linked to it
+  (`expenses.booking_id`); from then on the receipt counts instead of the booking.
+- **Trip types and companions.** Trips are business, solo, family or group, and can list companions
+  without accounts, who count toward the per-person cost. Trips can be edited after creation
+  (`PUT /api/trips/{id}`).
+- Personal workspaces show spending this month and this year on the home page; the home trip card
+  shows the trip total and cost per person. The mobile trip screen shows the total and bookings.
+- The landing page now leads with receipts and trip totals for individuals, families and
+  organisations, with a new "Who it's for" section.
+
 - **Trip planning on a map.** Every trip has an itinerary beside an interactive MapLibre map:
   - add stops by place search or by clicking the map, then drag to reorder them
   - choose car, van/truck, bike or walking, and compare alternative routes

@@ -115,6 +115,9 @@ export const trips = {
 
   getTravelers: (tripId: string) => get<TripTravelerDto[]>(`/api/trips/${tripId}/travelers`),
   getItinerary: (tripId: string) => get<ItineraryDto>(`/api/trips/${tripId}/itinerary`),
+  getBookings: (tripId: string) => get<TripBookingDto[]>(`/api/trips/${tripId}/bookings`),
+  /** Receipts plus bookings without a receipt yet, per person and per day. */
+  getCosts: (tripId: string) => get<TripCostsDto>(`/api/trips/${tripId}/costs`),
   assignTravelers: (tripId: string, travelerUserIds: string[]) =>
     put(`/api/trips/${tripId}/travelers`, { travelerUserIds }),
 
@@ -330,6 +333,51 @@ export interface TripDto {
   status: string;
   createdAt: string;
   updatedAt: string;
+  kind?: 'business' | 'personal' | 'family' | 'group';
+  companions?: string[];
+  travelerCount?: number;
+}
+
+export interface TripBookingDto {
+  id: string;
+  tripId: string;
+  kind: 'flight' | 'hotel' | 'car' | 'train' | 'bus' | 'ferry' | 'activity' | 'other';
+  status: 'planned' | 'booked' | 'cancelled';
+  title: string;
+  provider?: string;
+  reference?: string;
+  origin?: string;
+  destination?: string;
+  /** Local wall-clock time, e.g. "2026-11-09T10:15:00". */
+  startsAt?: string;
+  endsAt?: string;
+  amount: number;
+  currency: string;
+  paidBy: 'personal' | 'company';
+  travelers: number;
+  bookingUrl?: string;
+  notes?: string;
+  expenseId?: string;
+  expenseStatus?: string;
+}
+
+export interface TripCostsDto {
+  currency: string;
+  budget: number;
+  spent: number;
+  booked: number;
+  planned: number;
+  total: number;
+  remaining: number;
+  partySize: number;
+  days: number;
+  perPerson: number;
+  perDay: number;
+  receiptCount: number;
+  bookingCount: number;
+  bookingsWithoutReceipt: number;
+  byCategory: { key: string; label: string; amount: number }[];
+  otherCurrencies: { key: string; label: string; amount: number }[];
 }
 
 export interface TripTravelerDto {

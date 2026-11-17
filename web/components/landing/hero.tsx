@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { GithubIcon } from "./icons";
 import { DEMO_URL, GITHUB_URL, type LandingAccountState } from "./links";
 import { SectionHeading } from "./primitives";
-import { TripPlannerMock } from "./trip-planner-mock";
+import { TripCostMock } from "./trip-cost-mock";
 
 export function Hero({ account }: { account: LandingAccountState | null }) {
   const { t } = useI18n();
@@ -80,7 +80,7 @@ export function Hero({ account }: { account: LandingAccountState | null }) {
         </ul>
 
         <div className="lp-rise lp-rise-4 mx-auto mt-14 max-w-6xl text-left sm:mt-20">
-          <TripPlannerMock />
+          <TripCostMock />
         </div>
 
         <div className="mx-auto mt-16 max-w-4xl sm:mt-20">
