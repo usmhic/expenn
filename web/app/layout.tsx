@@ -14,11 +14,11 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'),
   applicationName: 'Expenn',
   title: {
-    default: 'Expenn - expense and travel management for teams',
+    default: 'Expenn - receipts, trips and spending for people and teams',
     template: '%s | Expenn',
   },
   description:
-    'Self-hosted expense, receipt, approval, and business-travel workflows for modern teams.',
+    'Self-hosted receipt and expense tracking with trip bookings, per-person trip totals, approvals and reimbursement.',
   authors: [{ name: 'usmhic', url: 'https://github.com/usmhic' }],
   creator: 'usmhic',
   publisher: 'usmhic',

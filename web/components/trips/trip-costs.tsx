@@ -111,7 +111,7 @@ export function TripCostSummary({
           warn={c.bookingsWithoutReceipt > 0}
         />
         {company ? (
-          <Fact icon={Wallet} label="Paid by you" value={money(c.paidPersonally)} sub={`${money(c.paidByCompany)} paid by the company`} />
+          <Fact icon={Wallet} label="Out of pocket" value={money(c.paidPersonally)} sub={`${money(c.paidByCompany)} paid by the company`} />
         ) : (
           <Fact icon={Users} label="Party" value={`${c.partySize} ${c.partySize === 1 ? "person" : "people"}`} />
         )}

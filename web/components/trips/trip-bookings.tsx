@@ -148,7 +148,7 @@ function BookingRow({
         )}
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           <StatusBadge value={b.status} />
-          {company && <span className="chip text-[0.7rem]">{b.paidBy === "company" ? "Company paid" : "Paid by you"}</span>}
+          {company && <span className="chip text-[0.7rem]">{b.paidBy === "company" ? "Company paid" : "Out of pocket"}</span>}
           {b.expenseId && <StatusBadge value={b.expenseStatus ?? "draft"} label={RECEIPT_LABELS[b.expenseStatus ?? "draft"]} />}
           {b.bookingUrl && (
             <a href={b.bookingUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
@@ -161,7 +161,7 @@ function BookingRow({
         <span className="text-sm font-semibold tabular-nums">{b.amount > 0 ? formatMoney(b.amount, b.currency) : "—"}</span>
         {canEdit && (
           <div className="flex items-center gap-1">
-            {!b.expenseId && !cancelled && b.amount > 0 && (
+            {!b.expenseId && b.status === "booked" && b.amount > 0 && (
               <CreateExpenseDialog
                 trips={[{ id: trip.id, name: trip.name, currency: trip.currency, status: trip.status }]}
                 defaultCurrency={b.currency}
