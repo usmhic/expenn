@@ -1,14 +1,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  CalendarDays, Camera, CheckCircle2, Clock, FileText, MapPin, Receipt, Route as RouteIcon, ShieldCheck, Wallet,
+  CalendarDays, Camera, CheckCircle2, Clock, FileText, MapPin, Receipt, ShieldCheck, Users,
 } from "lucide-react";
 import { cookies } from "next/headers";
 import { AppShell, StatusBadge } from "@/components/layout/navigation";
-import { EmptyState, PageHeader, SectionCard, Stat } from "@/components/layout/page";
+import { EmptyState, PageHeader, SectionCard } from "@/components/layout/page";
 import { CreateExpenseDialog, RequestApprovalDialog } from "@/components/dialogs";
+import { EditTripDialog } from "@/components/trips/edit-trip-dialog";
+import { TripBookings } from "@/components/trips/trip-bookings";
+import { TripCostSummary } from "@/components/trips/trip-costs";
 import { TripPlannerSection } from "@/components/trips/trip-planner-section";
 import { apiClient, type ItineraryDto } from "@/lib/api-client";
+import { tripKindLabel } from "@/lib/bookings";
 import { formatMoney } from "@/lib/expenses";
 import { formatDateRange, formatDistance, formatDuration, tripDays, tripPhase } from "@/lib/trips";
 
@@ -23,7 +27,7 @@ export default async function TravelerTripDetailPage({ params }: { params: Promi
   const trip = await api.trips.getById(tripId).catch(() => null);
   if (!trip) return notFound();
 
-  const [expenses, allDocuments, approvals, allTrips, currentUser, travelers, itinerary, orgs] = await Promise.all([
+  const [expenses, allDocuments, approvals, allTrips, currentUser, travelers, itinerary, orgs, costs, bookings] = await Promise.all([
     api.expenses.list({ tripId, mine: true }),
     api.documents.list({}).catch(() => []),
     api.trips.getApprovals({ tripId, mine: true }),
@@ -32,6 +36,8 @@ export default async function TravelerTripDetailPage({ params }: { params: Promi
     api.trips.getTravelers(tripId),
     api.trips.getItinerary(tripId).catch((): ItineraryDto => ({ tripId, profile: "driving-car", stops: [], routingEnabled: false })),
     api.organizations.list().catch(() => []),
+    api.trips.getCosts(tripId).catch(() => null),
+    api.trips.getBookings(tripId).catch(() => []),
   ]);
 
   const personal = orgs.find((o) => o.slug === workspace)?.accountType === "personal";
@@ -42,8 +48,8 @@ export default async function TravelerTripDetailPage({ params }: { params: Promi
     .reduce((sum, e) => sum + Number(e.amount), 0);
   const canRequestApproval = !approval || approval.status === "rejected" || approval.status === "cancelled";
   const isAssigned = travelers.some((t) => t.userId === currentUser.id);
-  const budget = Number(trip.budget);
-  const budgetPct = budget > 0 ? Math.round((spent / budget) * 100) : 0;
+  const canEdit = isAssigned || personal;
+  const partySize = costs?.partySize ?? Math.max(1, travelers.length) + (trip.companions?.length ?? 0);
   const phase = tripPhase(trip.startDate, trip.endDate);
   const route = itinerary.route;
 
@@ -63,6 +69,7 @@ export default async function TravelerTripDetailPage({ params }: { params: Promi
         eyebrow={
           <span className="flex flex-wrap items-center gap-2 normal-case tracking-normal">
             <StatusBadge value={trip.status} />
+            <span className="chip text-[0.7rem]">{tripKindLabel(trip.kind)}</span>
             {approval && <StatusBadge value={approval.status} label={approval.status === "requested" ? "Approval pending" : approval.status === "approved" ? "Approved to travel" : undefined} />}
             <span className="text-xs font-medium text-muted-foreground">
               {phase.kind === "ongoing" ? `Day ${phase.days} of ${tripDays(trip.startDate, trip.endDate)}` : phase.kind === "upcoming" ? `Starts in ${phase.days} day${phase.days === 1 ? "" : "s"}` : "Trip ended"}
@@ -74,10 +81,16 @@ export default async function TravelerTripDetailPage({ params }: { params: Promi
           <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <span className="flex items-center gap-1.5"><MapPin className="size-4" />{trip.routeSummary ?? trip.destination}</span>
             <span className="flex items-center gap-1.5"><CalendarDays className="size-4" />{formatDateRange(trip.startDate, trip.endDate)}</span>
+            <span className="flex items-center gap-1.5">
+              <Users className="size-4" />
+              {partySize} {partySize === 1 ? "person" : "people"}
+              {trip.companions && trip.companions.length > 0 ? ` · with ${trip.companions.join(", ")}` : ""}
+            </span>
           </span>
         }
         actions={
           <>
+            {personal && canEdit && <EditTripDialog trip={trip} personal />}
             {canRequestApproval && isAssigned && !personal && <RequestApprovalDialog tripId={trip.id} />}
             <Link href={`${root}/capture`} className="secondary-button"><Camera className="size-4" /> Capture</Link>
             <CreateExpenseDialog
@@ -89,43 +102,25 @@ export default async function TravelerTripDetailPage({ params }: { params: Promi
         }
       />
 
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <div className="stat">
-          <span className="stat-label"><Wallet className="size-4" /> Spent</span>
-          <span className="stat-value">{formatMoney(spent, trip.currency, { compact: true })}</span>
-          {budget > 0 ? (
-            <>
-              <div className="progress-track mt-1">
-                <div className={`progress-bar ${budgetPct > 100 ? "bg-destructive" : budgetPct > 85 ? "bg-amber-500" : ""}`} style={{ width: `${Math.min(100, budgetPct)}%` }} />
-              </div>
-              <span className="stat-sub">{budgetPct}% of {formatMoney(budget, trip.currency, { compact: true })} budget</span>
-            </>
-          ) : (
-            <span className="stat-sub">No budget set</span>
-          )}
-        </div>
-        <Stat icon={RouteIcon} label="Route" value={route ? formatDistance(route.distanceMeters) : "—"} sub={route ? `${formatDuration(route.durationSeconds)} travel · ${itinerary.stops.length} stops` : "Add stops to plan it"} />
-        <Stat icon={Receipt} label="Expenses" value={String(expenses.length)} sub={`${expenses.filter((e) => e.status === "draft").length} draft · ${expenses.filter((e) => e.status === "submitted").length} in review`} />
-        <Stat icon={FileText} label="Documents" value={String(documents.length)} sub="Tickets, bookings, visas" />
-      </div>
-
-      <section className="mb-6" aria-label="Route planner">
-        <TripPlannerSection
-          trip={{ id: trip.id, name: trip.name, currency: trip.currency, startDate: trip.startDate, endDate: trip.endDate, status: trip.status }}
-          itinerary={itinerary}
-          canEdit={isAssigned || personal}
-          canClaimMileage={isAssigned || personal}
-        />
-      </section>
-
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="min-w-0 space-y-5">
+          {costs && <TripCostSummary costs={costs} company={!personal} />}
+          <TripBookings
+            trip={{
+              id: trip.id, name: trip.name, currency: trip.currency, status: trip.status, destination: trip.destination,
+              startDate: trip.startDate, endDate: trip.endDate, partySize, origin: itinerary.stops[0]?.name,
+            }}
+            bookings={bookings}
+            canEdit={canEdit}
+            company={!personal}
+          />
         <SectionCard
-          title="Expenses on this trip"
-          description={expenses.length > 0 ? `${formatMoney(spent, trip.currency)} logged` : undefined}
+          title="Receipts"
+          description={expenses.length > 0 ? `${expenses.length} on this trip · ${formatMoney(spent, trip.currency)} in ${trip.currency}` : undefined}
           action={<Link href={`${root}/expenses?trip=${trip.id}`} className="text-sm font-medium text-primary hover:underline">View all</Link>}
         >
           {expenses.length === 0 ? (
-            <EmptyState icon={Receipt} title="No expenses yet" description="Snap receipts as you go — they'll be filed under this trip." />
+            <EmptyState icon={Receipt} title="No receipts yet" description="Snap receipts as you go. They're filed under this trip and added to its total." />
           ) : (
             <ul className="divide-list">
               {expenses.slice(0, 8).map((e) => (
@@ -144,6 +139,7 @@ export default async function TravelerTripDetailPage({ params }: { params: Promi
             </ul>
           )}
         </SectionCard>
+        </div>
 
         <div className="space-y-5">
           {!personal && (
@@ -197,6 +193,23 @@ export default async function TravelerTripDetailPage({ params }: { params: Promi
           </SectionCard>
         </div>
       </div>
+
+      <section className="mt-6" aria-labelledby="trip-route-title">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 id="trip-route-title" className="text-base font-semibold tracking-tight">Route &amp; stops</h2>
+            <p className="text-sm text-muted-foreground">
+              {route ? `${formatDistance(route.distanceMeters)} · ${formatDuration(route.durationSeconds)} travel · ${itinerary.stops.length} stops` : "Optional: pin the places you'll visit and claim mileage for driven routes."}
+            </p>
+          </div>
+        </div>
+        <TripPlannerSection
+          trip={{ id: trip.id, name: trip.name, currency: trip.currency, startDate: trip.startDate, endDate: trip.endDate, status: trip.status }}
+          itinerary={itinerary}
+          canEdit={canEdit}
+          canClaimMileage={canEdit}
+        />
+      </section>
     </AppShell>
   );
 }

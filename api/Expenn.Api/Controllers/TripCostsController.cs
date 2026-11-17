@@ -11,7 +11,7 @@ namespace Expenn.Api.Controllers;
 /// <summary>
 /// Read model: what a trip costs in total, per person and per day, combining receipts (Expenses)
 /// with bookings that have no receipt yet (Travel). Admins, managers of the owning team and personal
-/// workspaces see every receipt on the trip; a company traveler sees their own receipts and all bookings.
+/// workspaces see every receipt on the trip (company drafts stay private to their author); a company traveler sees their own receipts and all bookings.
 /// </summary>
 [ApiController]
 [Route("api/trips/{tripId}/costs")]
@@ -35,6 +35,8 @@ public class TripCostsController(AppDbContext db, ICurrentUserContext currentUse
 
         var expenseQuery = db.Expenses.Where(e => e.TripId == trip!.Id && e.DeletedAt == null);
         if (!seesAll) expenseQuery = expenseQuery.Where(e => e.UserId == currentUser.UserId);
+        // In a company, drafts stay private to the traveler who wrote them.
+        else if (!isPersonal) expenseQuery = expenseQuery.Where(e => e.Status != "draft" || e.UserId == currentUser.UserId);
         var expenses = await expenseQuery
             .Select(e => new TripCosts.ExpenseLine(
                 e.Id, e.BookingId, e.UserId, e.User.Name, e.Category, e.Amount, e.Currency, e.Status, e.Reimbursable))
