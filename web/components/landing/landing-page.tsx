@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getLandingAccountStateAction } from "@/app/actions";
+import { AudienceSection } from "./audience";
 import { FeatureSections } from "./features";
 import { SiteFooter } from "./footer";
 import { SiteHeader } from "./header";
@@ -33,6 +34,7 @@ function Landing() {
       <SiteHeader account={account} />
       <main className="flex-1">
         <Hero account={account} />
+        <AudienceSection />
         <HowItWorks />
         <TripsSection />
         <FeatureSections />
