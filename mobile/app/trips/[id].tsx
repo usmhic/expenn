@@ -17,6 +17,29 @@ import { radius, scale, shadow, spacing, statusStyle, typography } from '../../c
 type Trip = Awaited<ReturnType<typeof tripsApi.getById>>;
 type Expense = Awaited<ReturnType<typeof expensesApi.list>>[number];
 type Itinerary = Awaited<ReturnType<typeof tripsApi.getItinerary>>;
+type Booking = Awaited<ReturnType<typeof tripsApi.getBookings>>[number];
+type Costs = Awaited<ReturnType<typeof tripsApi.getCosts>>;
+
+const BOOKING_LABEL: Record<string, string> = {
+  flight: 'Flight', hotel: 'Stay', car: 'Car rental', train: 'Train', bus: 'Bus', ferry: 'Ferry', activity: 'Event / ticket', other: 'Other',
+};
+const TRIP_KIND_LABEL: Record<string, string> = { business: 'Business', personal: 'Solo', family: 'Family', group: 'Group' };
+
+function money(amount: number, currency: string) {
+  try {
+    return new Intl.NumberFormat('en', { style: 'currency', currency, maximumFractionDigits: amount % 1 === 0 ? 0 : 2 }).format(amount);
+  } catch {
+    return `${currency} ${amount.toFixed(2)}`;
+  }
+}
+
+/** "Dec 20, 09:10" from a local "2026-12-20T09:10:00" without shifting time zones. */
+function localWhen(value?: string) {
+  if (!value) return '';
+  const [date, time = ''] = value.split('T');
+  const hhmm = time.slice(0, 5);
+  return `${shortDay(date)}${hhmm && hhmm !== '00:00' ? `, ${hhmm}` : ''}`;
+}
 
 const PROFILE_LABEL: Record<string, string> = {
   'driving-car': 'by car', 'driving-hgv': 'by van', 'cycling-regular': 'by bike', 'foot-walking': 'on foot',
@@ -77,6 +100,8 @@ export default function TripDetailScreen() {
   const [trip, setTrip] = useState<Trip | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [itinerary, setItinerary] = useState<Itinerary | null>(null);
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [costs, setCosts] = useState<Costs | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -86,14 +111,18 @@ export default function TripDetailScreen() {
     if (!id) return;
     setError('');
     try {
-      const [tripData, expenseData, itineraryData] = await Promise.all([
+      const [tripData, expenseData, itineraryData, bookingData, costData] = await Promise.all([
         tripsApi.getById(id),
         expensesApi.list({ tripId: id, mine: true }),
         tripsApi.getItinerary(id).catch(() => null),
+        tripsApi.getBookings(id).catch(() => []),
+        tripsApi.getCosts(id).catch(() => null),
       ]);
       setTrip(tripData);
       setExpenses(expenseData);
       setItinerary(itineraryData);
+      setBookings(bookingData);
+      setCosts(costData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load trip.');
     } finally {
@@ -105,8 +134,9 @@ export default function TripDetailScreen() {
   useEffect(() => { load(); }, [session?.access_token, id]);
 
   const progress = trip ? tripProgress(trip) : null;
-  const totalSpend = expenses
-    .filter((e) => ['submitted', 'approved', 'reimbursed'].includes(e.status))
+  // The trip total counts receipts and bookings without a receipt; fall back to receipts alone.
+  const totalSpend = costs?.total ?? expenses
+    .filter((e) => e.status !== 'rejected' && e.currency === trip?.currency)
     .reduce((s, e) => s + Number(e.amount), 0);
   const budget = trip ? Number(trip.budget) : 0;
   const budgetPct = budget > 0 ? Math.min(100, Math.round((totalSpend / budget) * 100)) : 0;
@@ -198,6 +228,11 @@ export default function TripDetailScreen() {
                   </View>
                 );
               })()}
+              {trip.kind && (
+                <View style={[s.chip, { backgroundColor: colors.surfaceAlt }]}>
+                  <Text style={[s.chipText, { color: colors.textSecondary }]}>{TRIP_KIND_LABEL[trip.kind] ?? trip.kind}</Text>
+                </View>
+              )}
               {pendingCount > 0 && (
                 <View style={[s.chip, { backgroundColor: colors.expiring + '18' }]}>
                   <Text style={[s.chipText, { color: colors.expiring }]}>{pendingCount} pending</Text>
@@ -205,11 +240,32 @@ export default function TripDetailScreen() {
               )}
             </View>
 
+            {/* Trip total: receipts plus bookings, per person and per day */}
+            <View style={s.totalRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.budgetLabel, { color: colors.textSecondary }]}>Trip total</Text>
+                <Text style={[s.totalValue, { color: colors.textPrimary }]}>{money(totalSpend, trip.currency)}</Text>
+              </View>
+              {costs && (
+                <View style={s.totalSide}>
+                  <Text style={[s.budgetLabel, { color: colors.textSecondary }]}>Per person</Text>
+                  <Text style={[s.budgetValue, { color: colors.textPrimary }]}>{money(costs.perPerson, trip.currency)}</Text>
+                  <Text style={[s.budgetLabel, { color: colors.textMuted }]}>{costs.partySize} {costs.partySize === 1 ? 'person' : 'people'} · {money(costs.perDay, trip.currency)}/day</Text>
+                </View>
+              )}
+            </View>
+            {costs && (costs.booked > 0 || costs.planned > 0) && (
+              <Text style={[s.budgetLabel, { color: colors.textSecondary }]}>
+                {money(costs.spent, trip.currency)} in receipts · {money(costs.booked, trip.currency)} booked
+                {costs.planned > 0 ? ` · ${money(costs.planned, trip.currency)} to book` : ''}
+              </Text>
+            )}
+
             {/* Budget bar — mirrors web */}
             {budget > 0 && (
               <View style={s.budgetSection}>
                 <View style={s.budgetLabels}>
-                  <Text style={[s.budgetLabel, { color: colors.textSecondary }]}>Spend</Text>
+                  <Text style={[s.budgetLabel, { color: colors.textSecondary }]}>Budget</Text>
                   <Text style={[s.budgetValue, { color: overBudget ? colors.expired : colors.textPrimary }]}>
                     {trip.currency} {totalSpend.toFixed(0)}
                     <Text style={[s.budgetTotal, { color: colors.textMuted }]}> / {trip.currency} {budget.toFixed(0)}</Text>
@@ -232,6 +288,38 @@ export default function TripDetailScreen() {
               </View>
             )}
           </View>
+
+          {/* Bookings — added on the web, at hand on the road */}
+          {bookings.length > 0 && (
+            <View style={[s.itineraryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>Bookings</Text>
+              {bookings.map((b) => {
+                const tone = statusStyle(b.status === 'booked' ? 'approved' : b.status === 'planned' ? 'submitted' : 'draft', colors);
+                const when = [localWhen(b.startsAt), localWhen(b.endsAt)].filter(Boolean).join(' → ');
+                const meta = [BOOKING_LABEL[b.kind], b.provider, b.reference && `Ref ${b.reference}`].filter(Boolean).join(' · ');
+                return (
+                  <View key={b.id} style={[s.bookingRow, { borderTopColor: colors.border }]}>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={[s.stopName, { color: colors.textPrimary, textDecorationLine: b.status === 'cancelled' ? 'line-through' : 'none' }]} numberOfLines={1}>{b.title}</Text>
+                      <Text style={[s.stopMeta, { color: colors.textSecondary }]} numberOfLines={1}>{meta}</Text>
+                      {when ? <Text style={[s.stopMeta, { color: colors.textSecondary }]} numberOfLines={1}>{when}</Text> : null}
+                      {b.bookingUrl ? (
+                        <TouchableOpacity onPress={() => Linking.openURL(b.bookingUrl!).catch(() => {})}>
+                          <Text style={[s.mapsBtnText, { color: colors.accent }]}>Manage booking</Text>
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+                    <View style={s.expenseRight}>
+                      <Text style={[s.expenseAmount, { color: colors.textPrimary }]}>{b.amount > 0 ? money(b.amount, b.currency) : '—'}</Text>
+                      <View style={[s.statusBadge, { backgroundColor: tone.bg }]}>
+                        <Text style={[s.statusBadgeText, { color: tone.fg }]}>{b.status === 'planned' ? 'To book' : b.status}</Text>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
 
           {/* Itinerary — planned on the web, followed on the road */}
           {itinerary && itinerary.stops.length > 0 && (
@@ -281,7 +369,7 @@ export default function TripDetailScreen() {
           <View style={s.section}>
             <View style={s.sectionHeader}>
               <Text style={[s.sectionTitle, { color: colors.textPrimary }]}>
-                My expenses {expenses.length > 0 && `(${expenses.length})`}
+                My receipts {expenses.length > 0 && `(${expenses.length})`}
               </Text>
               <TouchableOpacity
                 style={[s.addBtn, { backgroundColor: colors.accentDim }]}
@@ -295,7 +383,7 @@ export default function TripDetailScreen() {
             {expenses.length === 0 ? (
               <View style={[s.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <ReceiptIcon color={colors.textMuted} size={28} />
-                <Text style={[s.emptyTitle, { color: colors.textPrimary }]}>No expenses yet</Text>
+                <Text style={[s.emptyTitle, { color: colors.textPrimary }]}>No receipts yet</Text>
                 <Text style={[s.emptyText, { color: colors.textSecondary }]}>
                   Tap "Add" to capture a receipt for this trip.
                 </Text>
@@ -394,6 +482,10 @@ const s = StyleSheet.create({
   budgetTotal: { fontFamily: 'Inter-Regular' },
   budgetTrack: { height: 8, borderRadius: radius.full, overflow: 'hidden' },
   budgetFill: { height: '100%', borderRadius: radius.full },
+  totalRow: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.md },
+  totalValue: { fontFamily: 'Inter-Bold', fontSize: typography.xl },
+  totalSide: { alignItems: 'flex-end' },
+  bookingRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: spacing.sm },
   budgetOverText: { fontFamily: 'Inter-Bold', fontSize: typography.xs },
 
   // Expenses
