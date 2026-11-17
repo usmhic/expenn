@@ -11,7 +11,7 @@ transactions.
 |---|---|---|---|
 | Identity | `identity` | `user`, `session`, `account`, `verification` | — |
 | Organizations | `organizations` | `organization`, `member`, `invitation`, `team`, `team_member` | Identity |
-| Travel | `travel` | `trips`, `trip_traveler`, `trip_stops`, `travel_approvals` | Identity, Organizations |
+| Travel | `travel` | `trips`, `trip_traveler`, `trip_stops`, `trip_bookings`, `travel_approvals` | Identity, Organizations |
 | Expenses | `expenses` | `expenses`, `expense_comment` | Identity, Organizations, Travel |
 | Documents | `documents` | `documents` | Identity, Organizations, Travel |
 
@@ -29,6 +29,10 @@ relationships. `AppDbContext` composes those modules into one unit of work.
   enabled and an in-memory transport during local development.
 - A module owns writes to its tables. New cross-module behavior should depend on
   a service or event contract, not another module's persistence implementation.
+- Read models may join across modules but never write: trip costs
+  (`/api/trips/{id}/costs`) combine Travel bookings with Expenses receipts. A
+  receipt filed for a booking is linked from the Expenses side
+  (`expenses.booking_id`), so Travel never depends on Expenses.
 - Cross-schema foreign keys intentionally protect integrity while all modules
   share one database. They identify the dependencies that must be replaced by
   contracts if a module is extracted later.
@@ -38,7 +42,8 @@ relationships. `AppDbContext` composes those modules into one unit of work.
 `Data/Migrations/20260814000000_MultiSchemaBaseline.cs` is the baseline EF Core
 migration; later migrations (for example `AddExpenseReviewAudit`, which adds the
 expense review trail columns, and `AddTripItinerary`, which adds `travel.trip_stops`
-and the cached `route_*` columns on `travel.trips`) build on it. On a fresh database the baseline creates
+and the cached `route_*` columns on `travel.trips`, and `AddTripBookings`, which adds
+`travel.trip_bookings`, `travel.trips.kind`/`companions` and `expenses.expenses.booking_id`) build on it. On a fresh database the baseline creates
 every schema and table. On a
 legacy database it moves the public tables into a temporary `legacy` schema,
 creates the domain-owned tables, copies rows in dependency order, then removes

@@ -4,10 +4,10 @@
 
 ### Receipts in, reimbursements out.
 
-**Self-hosted expense and travel management for teams.**
-Snap a receipt on the road, log it against a trip, submit it when you land —
-and let finance approve the whole thing from one dashboard. No spreadsheet
-graveyards, no shoebox of crumpled receipts.
+**Self-hosted receipt, trip and expense tracking for people, families and teams.**
+Snap receipts, save your flights and hotels, and see what every trip really costs,
+per person and per day. Companies get travel approvals and one queue to review and
+reimburse. No spreadsheet graveyards, no shoebox of crumpled receipts.
 
 <br />
 
@@ -47,14 +47,20 @@ Local setup, shared workspace ports, environment conventions, and `dev` workflow
 > personal account or a company workspace. Self-hosting the stack gives you both sides of the flow
 > (traveler *and* approver) on your own machine in a couple of minutes.
 
-## ✨ Two sides, one flow
+## ✨ Who it's for
 
-**For travelers** 🎒 — plan multi-stop trips on a map (routes, travel times, optimised stop
-order), capture receipts on the go, log expenses against a trip, store passports
-and itineraries in the document vault, submit for reimbursement, fix anything that's sent back, and
-always see what you're owed.
+**For individuals and families** 🧳 — keep every receipt, see what you spend this month and
+this year, and give each trip a budget. Mark a trip as solo, family or group, add who's coming,
+and save flights, stays, rentals and tickets with their prices. Expenn adds bookings and receipts
+together (counting each once) and shows the trip total per person and per day.
 
-**For finance and admins** 📊 — create and assign trips, work through one review-and-pay queue
+**For travelers** 🎒 — capture receipts on the go, log expenses against a trip, use **Find & book**
+to search flights, hotels and cars with the trip's dates, save the confirmation to the trip, store
+passports and itineraries in the document vault, submit for reimbursement, and always see what
+you're owed. Multi-stop route planning on a map is there when you need it.
+
+**For finance and admins** 📊 — create and assign trips, see each trip's total spend per traveler
+and category, work through one review-and-pay queue
 (bulk approve, send back with a reason, mark paid), export to CSV for payroll or accounting, and
 track spend per currency, per trip, and how fast people get reimbursed.
 
