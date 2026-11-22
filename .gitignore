@@ -82,3 +82,6 @@ Thumbs.db
 ehthumbs.db
 Desktop.ini
 .cache/
+
+# Local / CI check evidence (uploaded separately by Actions)
+/ci-logs/

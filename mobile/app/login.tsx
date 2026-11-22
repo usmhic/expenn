@@ -17,11 +17,10 @@ import { ArrowLeftIcon, BriefcaseIcon, CompassIcon, MailIcon, ShieldIcon, UserIc
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { isTablet, ms, radius, scale, SCREEN_W, shadow, spacing, typography } from '../constants/theme';
+import { API_URL } from '../lib/api';
 
 type AuthTab = 'email' | 'password' | 'ad';
 type OtpStep = 'email' | 'code';
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:5000';
 
 export default function LoginScreen() {
   const { colors } = useTheme();

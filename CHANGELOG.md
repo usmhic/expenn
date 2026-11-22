@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Personal workspaces can create their own trips.
 - Documents can be linked to a trip, and expiring passports and visas are flagged.
 - `OpenRouteService__ApiKey` / `OpenRouteService__BaseUrl` (API) and `NEXT_PUBLIC_MAP_STYLE_URL` / `NEXT_PUBLIC_MAP_STYLE_URL_DARK` (web) settings.
+- Logged web CI checks, pinned CI Node versions, corrected dev/release documentation, and a dated repository review/cleanup record. Scheduled dependency version PRs are paused.
 
 - **Review & pay** page for admins and managers: tabs for to review, to pay, paid, and
   sent back; bulk approve, send back, and mark paid; one-click selection of expenses

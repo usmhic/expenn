@@ -33,28 +33,44 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check environment template
-        working-directory: ${{ github.workspace }}
-        run: node scripts/check-env.mjs
-
       - uses: pnpm/action-setup@v4
         with:
           version: 11.6.0
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: "24.18.0"
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Verify CI log runner
+        working-directory: ${{ github.workspace }}
+        run: node scripts/ci-check.mjs log-runner node --test scripts/ci-check.test.mjs
+
+      - name: Check environment template
+        working-directory: ${{ github.workspace }}
+        run: node scripts/ci-check.mjs environment node scripts/check-env.mjs
 
       - run: pnpm install --frozen-lockfile
         name: Install dependencies
 
-      - run: pnpm run types:check
+      - run: node ../scripts/ci-check.mjs types pnpm run types:check
         name: Type-check
 
-      - run: pnpm run lint
+      - run: node ../scripts/ci-check.mjs lint pnpm run lint
         name: Lint
+
+      - name: Production build
+        run: node ../scripts/ci-check.mjs build pnpm run build
+
+      - name: Upload check logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-check-logs
+          path: ci-logs/*.log
+          retention-days: 14
+          if-no-files-found: warn
 
   docker:
     name: Docker build & push

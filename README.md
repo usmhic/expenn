@@ -2,7 +2,7 @@
 
 # 🧾 Expenn
 
-### Receipts in, reimbursements out.
+### Receipts, trips, and reviews in one place.
 
 **Self-hosted receipt, trip and expense tracking for people, families and teams.**
 Snap receipts, save your flights and hotels, and see what every trip really costs,
@@ -34,6 +34,8 @@ reimburse. No spreadsheet graveyards, no shoebox of crumpled receipts.
 
 Local setup, shared workspace ports, environment conventions, and `dev` workflows:
 [Local development](./LOCAL_DEVELOPMENT.md).
+Review scope, validation evidence, workflow changes, and bot cleanup:
+[Review log](docs/REVIEW_LOG.md).
 
 ## 🎬 Try the demo
 
@@ -220,8 +222,8 @@ those published ports in the deployment platform or a production override.
 | `web-ci.yml` | Type-check, lint, build, publish, and smoke-test the web image |
 | `mobile-android-dev.yml` | Type-check, signed APK, distribute to testers via Firebase App Distribution (`dev`) |
 | `mobile-ios-dev.yml` | Signed Ad Hoc IPA, distribute to testers via Firebase App Distribution (manual) |
-| `mobile-android-release.yml` | Signed AAB, upload to Google Play Console (`main`) |
-| `mobile-ios-release.yml` | Signed IPA, upload to App Store Connect / TestFlight (`main`) |
+| `mobile-android-release.yml` | Signed AAB, upload to Google Play Console (manual from `dev`) |
+| `mobile-ios-release.yml` | Signed IPA, upload to App Store Connect / TestFlight (manual from `dev`) |
 | `release.yml` | Create a GitHub release from a `vX.Y.Z` tag |
 
 Container images live at `ghcr.io/usmhic/expenn-api` and `ghcr.io/usmhic/expenn-web`. Mobile

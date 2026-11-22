@@ -46,19 +46,18 @@ GitHub Secrets and orchestrated by Fastlane (`fastlane/Fastfile`, without `match
 
 | Workflow | Trigger | What it does |
 |---|---|---|
-| `mobile-android-ci.yml` | PR / push to `dev` (path `mobile/**`) | Type-check → prebuild → signed internal APK (`fastlane android android_internal`) → workflow artifact |
-| `mobile-ios-ci.yml` | PR / push to `dev` (path `mobile/**`) | Type-check → prebuild → signed Ad Hoc IPA (`fastlane ios ios_adhoc`) → workflow artifact |
-| `mobile-android-release.yml` | push to `main` | Prebuild → signed release AAB → `fastlane android android_release` uploads to Play Console |
-| `mobile-ios-release.yml` | push to `main` | Prebuild → signed release IPA → `fastlane ios ios_release` uploads to TestFlight |
+| `mobile-android-dev.yml` | push to `dev` or manual dispatch (path `mobile/**`) | Type-check → prebuild → signed internal APK (`fastlane android android_internal`) → workflow artifact |
+| `mobile-ios-dev.yml` | manual dispatch | Type-check → prebuild → signed Ad Hoc IPA (`fastlane ios ios_adhoc`) → workflow artifact |
+| `mobile-android-release.yml` | manual dispatch from `dev` (production environment) | Prebuild → signed release AAB → `fastlane android android_release` uploads to Play Console |
+| `mobile-ios-release.yml` | manual dispatch from `dev` (production environment) | Prebuild → signed release IPA → `fastlane ios ios_release` uploads to TestFlight |
 
-### ⚠️ Known blocker: placeholder app icons
+### App artwork
 
-`assets/icon.png`, `assets/adaptive-icon.png`, and `assets/splash-icon.png` are all 1×1 pixel
-stub images today. `expo prebuild --platform android` **fails outright** trying to process the
-adaptive icon in this state (confirmed locally) — real icon assets (1024×1024 for `icon.png`/
-`adaptive-icon.png` at minimum) must be added before `mobile-android-ci.yml` or
-`mobile-android-release.yml` can pass. iOS prebuild currently tolerates the placeholders and
-succeeds, but shipping 1×1 icons would fail App Store review regardless.
+Launcher, adaptive, splash, and notification assets are committed under
+`assets/`. Regenerate from the source artwork with
+`node scripts/generate-brand.mjs` at the repository root after installing web
+dependencies. Preview both Android adaptive masks and iOS launcher rendering
+before submitting a release.
 
 ### Required GitHub Secrets
 
@@ -96,22 +95,21 @@ accounts. Nothing here should ever be committed to the repo.
 
 ### What you still need to do before this runs end-to-end
 
-1. Replace the placeholder icons (above).
+1. Preview the committed app artwork and verify the bundle identifiers.
 2. Generate both Android keystores locally (command above) and add all four secrets per keystore.
 3. In Apple Developer: create a Distribution certificate, an Ad Hoc profile (with test device UDIDs
    registered) and an App Store profile, and an App Store Connect API key.
 4. In Play Console: create the app listing (first upload to a new app still needs to happen through
    the console) and a service account with API access.
 5. Add every secret/variable above under **Settings → Secrets and variables → Actions**.
-6. Trigger `mobile-android-ci.yml`/`mobile-ios-ci.yml` via `workflow_dispatch` first and check the
-   Actions log before relying on the automatic PR/`dev` triggers — same for the release workflows
-   before merging to `main`, since those hit real store APIs.
+6. Trigger `mobile-android-dev.yml`/`mobile-ios-dev.yml` via `workflow_dispatch` first and check the
+   Actions log before relying on the automatic Android `dev` trigger — same for the release workflows
+   from `dev` only when ready, since those hit real store APIs.
 
-I haven't been able to run an actual signed build myself — there's no macOS/Xcode or real Apple/
-Google credentials in this environment. What's verified: `expo prebuild` succeeds for iOS and
-correctly resolves `com.expenn.traveler` everywhere, `expo prebuild` for Android currently fails on
-the placeholder icon (see above), the version-bump script, and all four workflow YAML files parse
-correctly. The Fastlane lanes themselves are unverified beyond Ruby syntax checking.
+Signed delivery requires a configured runner and real Apple/Google credentials.
+Run the tester workflows before store submission and inspect their artifacts
+and logs. Generated native projects and signing credentials must stay out of Git.
+See the root [mobile delivery guide](../MOBILE_DELIVERY.md) for the supported flow.
 
 ## Auth flows
 
